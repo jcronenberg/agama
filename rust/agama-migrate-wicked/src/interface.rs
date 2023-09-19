@@ -72,13 +72,13 @@ impl From<Interface> for model::Connection {
         let mut con = model::Connection::new(val.name.clone(), DeviceType::Ethernet);
         let base_connection = con.base_mut();
         base_connection.interface = val.name.clone();
-        base_connection.ipv4 = val.into();
+        base_connection.ipv4 = (&val).into();
         con
     }
 }
 
-impl From<Interface> for Ipv4Config {
-    fn from(val: Interface) -> Self {
+impl From<&Interface> for Ipv4Config {
+    fn from(val: &Interface) -> Self {
         let method = if val.ipv4.enabled && val.ipv4_static.is_some() {
             "manual"
         } else if !val.ipv4.enabled {
@@ -90,7 +90,10 @@ impl From<Interface> for Ipv4Config {
         let mut ipv4 = Ipv4Config::default();
         if val.ipv4_static.is_some() {
             ipv4.addresses =
-                vec![IpAddress::from_str(val.ipv4_static.unwrap().address.local.as_str()).unwrap()]
+                vec![
+                    IpAddress::from_str(val.ipv4_static.as_ref().unwrap().address.local.as_str())
+                        .unwrap(),
+                ]
         }
         ipv4.method = IpMethod::from_str(method).unwrap();
 
