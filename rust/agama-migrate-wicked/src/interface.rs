@@ -1,5 +1,6 @@
-use agama_dbus_server::network::model::{self, IpAddress, IpMethod, Ipv4Config};
+use agama_dbus_server::network::model::{self, IpConfig, IpMethod};
 use agama_lib::network::types::DeviceType;
+use cidr::IpInet;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -72,12 +73,12 @@ impl From<Interface> for model::Connection {
         let mut con = model::Connection::new(val.name.clone(), DeviceType::Ethernet);
         let base_connection = con.base_mut();
         base_connection.interface = val.name.clone();
-        base_connection.ipv4 = (&val).into();
+        base_connection.ip_config = (&val).into();
         con
     }
 }
 
-impl From<&Interface> for Ipv4Config {
+impl From<&Interface> for IpConfig {
     fn from(val: &Interface) -> Self {
         let method = if val.ipv4.enabled && val.ipv4_static.is_some() {
             "manual"
@@ -87,17 +88,17 @@ impl From<&Interface> for Ipv4Config {
             "auto"
         };
 
-        let mut ipv4 = Ipv4Config::default();
+        let mut ip = IpConfig::default();
         if val.ipv4_static.is_some() {
-            ipv4.addresses =
+            ip.addresses =
                 vec![
-                    IpAddress::from_str(val.ipv4_static.as_ref().unwrap().address.local.as_str())
+                    IpInet::from_str(val.ipv4_static.as_ref().unwrap().address.local.as_str())
                         .unwrap(),
                 ]
         }
-        ipv4.method = IpMethod::from_str(method).unwrap();
+        ip.method4 = IpMethod::from_str(method).unwrap();
 
-        ipv4
+        ip
     }
 }
 
@@ -121,9 +122,9 @@ mod tests {
         };
 
         let static_connection: model::Connection = static_interface.into();
-        assert_eq!(static_connection.base().ipv4.method, IpMethod::Manual);
+        assert_eq!(static_connection.base().ip_config.method4, IpMethod::Manual);
         assert_eq!(
-            static_connection.base().ipv4.addresses[0].to_string(),
+            static_connection.base().ip_config.addresses[0].to_string(),
             "127.0.0.1/8"
         );
     }
@@ -139,7 +140,7 @@ mod tests {
         };
 
         let static_connection: model::Connection = static_interface.into();
-        assert_eq!(static_connection.base().ipv4.method, IpMethod::Auto);
-        assert_eq!(static_connection.base().ipv4.addresses.len(), 0);
+        assert_eq!(static_connection.base().ip_config.method4, IpMethod::Auto);
+        assert_eq!(static_connection.base().ip_config.addresses.len(), 0);
     }
 }

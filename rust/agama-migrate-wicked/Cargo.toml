@@ -12,3 +12,4 @@ agama-lib = { path="../agama-lib" }
 regex = "1.9.5"
 agama-dbus-server = { path="../agama-dbus-server" }
 async-std = "1.12.0"
+cidr = { version = "0.2.2", features = ["serde"] }
