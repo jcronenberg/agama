@@ -3,6 +3,7 @@ use clap::Parser;
 mod commands;
 mod config;
 mod error;
+mod logs;
 mod printers;
 mod profile;
 mod progress;
@@ -16,6 +17,7 @@ use agama_lib::progress::ProgressMonitor;
 use async_std::task::{self, block_on};
 use commands::Commands;
 use config::run as run_config_cmd;
+use logs::run as run_logs_cmd;
 use printers::Format;
 use profile::run as run_profile_cmd;
 use progress::InstallerProgress;
@@ -133,6 +135,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             block_on(install(&manager, 3))
         }
         Commands::Questions(subcommand) => block_on(run_questions_cmd(subcommand)),
+        Commands::Logs(subcommand) => block_on(run_logs_cmd(subcommand)),
         Commands::Wicked(subcommand) => block_on(run_wicked_cmd(subcommand, cli.format)),
         _ => unimplemented!(),
     }
