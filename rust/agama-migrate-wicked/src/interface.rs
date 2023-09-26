@@ -1,8 +1,7 @@
-use agama_dbus_server::network::model::{self, IpConfig, IpMethod};
-use agama_lib::network::types::DeviceType;
+use agama_dbus_server::network::model::{self, IpConfig, IpMethod, Parent};
 use cidr::IpInet;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -21,6 +20,13 @@ pub struct Interface {
     pub ipv6_dhcp: Option<Ipv6Dhcp>,
     #[serde(rename = "ipv6-auto", skip_serializing_if = "Option::is_none")]
     pub ipv6_auto: Option<Ipv6Auto>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bond: Option<Bond>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Clone, Deserialize)]
+pub enum ParentKind {
+    Bond,
 }
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
@@ -35,7 +41,12 @@ pub struct Firewall {}
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
-pub struct Link {}
+pub struct Link {
+    #[serde(rename = "master", skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<ParentKind>,
+}
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -113,13 +124,134 @@ where
         .collect())
 }
 
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+pub struct Bond {
+    pub mode: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub miimon: Option<Miimon>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arpmon: Option<ArpMon>,
+    #[serde(deserialize_with = "unwrap_slaves")]
+    pub slaves: Vec<Slave>,
+}
+
+impl Bond {
+    pub fn primary(self: &Bond) -> Option<&String> {
+        for s in self.slaves.iter() {
+            if s.primary.is_some() && s.primary.unwrap() {
+                return Some(&s.device);
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+pub struct Slave {
+    pub device: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary: Option<bool>,
+}
+
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+pub struct Miimon {
+    pub frequency: u32,
+    #[serde(rename = "carrier-detect")]
+    pub carrier_detect: String,
+}
+
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+pub struct ArpMon {
+    pub interval: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validate: Option<String>,
+    #[serde(rename = "validate-target")]
+    pub validate_target: Option<String>,
+    pub targets: Vec<ArpMonTargetAddressV4>,
+}
+
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+pub struct ArpMonTargetAddressV4 {
+    #[serde(rename = "ipv4-address")]
+    pub ipv4_address: String,
+}
+
+fn unwrap_slaves<'de, D>(deserializer: D) -> Result<Vec<Slave>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+    struct Slaves {
+        slave: Vec<Slave>,
+    }
+    Ok(Slaves::deserialize(deserializer)?.slave)
+}
+
+impl From<Bond> for HashMap<String, String> {
+    fn from(bond: Bond) -> HashMap<String, String> {
+        let mut h: HashMap<String, String> = HashMap::new();
+
+        h.insert(String::from("mode"), bond.mode.clone());
+        if let Some(p) = bond.primary() {
+            h.insert(String::from("primary"), p.clone());
+        }
+
+        if let Some(m) = &bond.miimon {
+            h.insert(String::from("miimon"), format!("{}", m.frequency));
+        }
+
+        if let Some(a) = &bond.arpmon {
+            h.insert(String::from("arp_interval"), format!("{}", a.interval));
+            if let Some(v) = &a.validate {
+                h.insert(String::from("arp_validate"), v.clone());
+            }
+
+            if !a.targets.is_empty() {
+                let sv = a
+                    .targets
+                    .iter()
+                    .map(|c| c.ipv4_address.as_ref())
+                    .collect::<Vec<&str>>()
+                    .join(",");
+                h.insert(String::from("arp_ip_target"), sv);
+            }
+
+            if let Some(v) = &a.validate_target {
+                h.insert(String::from("arp_all_targets"), v.clone());
+            }
+        }
+        h
+    }
+}
+
 impl From<Interface> for model::Connection {
-    fn from(val: Interface) -> Self {
-        let mut con = model::Connection::new(val.name.clone(), DeviceType::Ethernet);
-        let base_connection = con.base_mut();
-        base_connection.interface = val.name.clone();
-        base_connection.ip_config = (&val).into();
-        con
+    fn from(ifc: Interface) -> model::Connection {
+        let mut base = model::BaseConnection {
+            id: ifc.name.clone(),
+            interface: ifc.name.clone(),
+            ip_config: (&ifc).into(),
+            ..Default::default()
+        };
+
+        if ifc.link.kind.is_some() && ifc.link.parent.is_some() {
+            let interface = ifc.link.parent.clone().unwrap();
+            let kind = match ifc.link.kind {
+                Some(p) => match &p {
+                    ParentKind::Bond => model::ParentKind::Bond,
+                },
+                None => panic!("Missing ParentType"),
+            };
+            base.parent = Some(Parent { interface, kind });
+        }
+
+        if let Some(b) = ifc.bond {
+            model::Connection::Bond(model::BondConnection {
+                base,
+                bond: model::BondConfig { options: b.into() },
+            })
+        } else {
+            model::Connection::Ethernet(model::EthernetConnection { base })
+        }
     }
 }
 

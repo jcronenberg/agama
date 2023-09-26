@@ -1,6 +1,7 @@
-use crate::interface::Interface;
+use crate::interface::{Interface, ParentKind};
 use quick_xml::de::from_str;
 use regex::Regex;
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -19,13 +20,32 @@ fn replace_colons(colon_string: String) -> String {
     replaced
 }
 
+pub fn post_process_interface(interfaces: &mut [Interface]) {
+    let mut helper = HashMap::new();
+    for (idx, i) in interfaces.iter().enumerate() {
+        if let Some(parent) = &i.link.parent {
+            for j in interfaces.iter() {
+                if j.name == *parent && j.bond.is_some() {
+                    helper.insert(idx, Some(ParentKind::Bond));
+                }
+            }
+        }
+    }
+    for (_, (k, v)) in helper.iter().enumerate() {
+        if let Some(ifc) = interfaces.get_mut(*k) {
+            ifc.link.kind = v.clone();
+        }
+    }
+}
+
 pub async fn read(path: PathBuf) -> Result<Vec<Interface>, io::Error> {
-    let interfaces: Vec<Interface> = if path.is_dir() {
+    let mut interfaces: Vec<Interface> = if path.is_dir() {
         fs::read_dir(path)?
             .flat_map(|res| res.map(|e| read_xml(e.path()).unwrap()).unwrap())
             .collect::<Vec<_>>()
     } else {
         read_xml(path).unwrap()
     };
+    post_process_interface(&mut interfaces);
     Ok(interfaces)
 }
