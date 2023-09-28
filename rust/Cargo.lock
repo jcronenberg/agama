@@ -102,9 +102,11 @@ dependencies = [
  "async-std",
  "cidr",
  "clap",
+ "log",
  "quick-xml",
  "regex",
  "serde",
+ "simplelog",
 ]
 
 [[package]]

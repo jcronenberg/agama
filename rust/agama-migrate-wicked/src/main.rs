@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand};
 use migrate::migrate;
 use reader::read as wicked_read;
 use std::process::{ExitCode, Termination};
+use log::*;
 
 #[derive(Parser)]
 #[command(name = "migrate-wicked", version, about, long_about = None)]
@@ -58,6 +59,14 @@ impl Termination for CliResult {
 
 #[async_std::main]
 async fn main() -> CliResult {
+    simplelog::TermLogger::init(
+            LevelFilter::Info,
+            simplelog::Config::default(),
+            simplelog::TerminalMode::Stderr,
+            simplelog::ColorChoice::Auto,
+        )
+        .unwrap();
+
     let cli = Cli::parse();
 
     if let Err(error) = run_command(cli).await {

@@ -15,6 +15,8 @@ async-std = "1.12.0"
 cidr = { version = "0.2.2", features = ["serde"] }
 clap = { version = "4.1.4", features = ["derive", "wrap_help"] }
 anyhow = "1.0.71"
+log = "0.4"
+simplelog = "0.12.1"
 
 [[bin]]
 name = "migrate-wicked"
