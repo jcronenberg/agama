@@ -9,14 +9,13 @@
     <enabled>true</enabled>
     <arp-verify>true</arp-verify>
   </ipv4>
-  <ipv4:static>
-    <address>
-      <local>192.168.101.5/24</local>
-    </address>
-  </ipv4:static>
   <ipv6>
     <enabled>true</enabled>
     <privacy>prefer-public</privacy>
     <accept-redirects>false</accept-redirects>
   </ipv6>
+  <ipv6:auto>
+    <enabled>true</enabled>
+    <update>dns</update>
+  </ipv6:auto>
 </interface>

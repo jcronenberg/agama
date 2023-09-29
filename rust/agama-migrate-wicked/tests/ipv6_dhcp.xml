@@ -14,9 +14,15 @@
     <privacy>prefer-public</privacy>
     <accept-redirects>false</accept-redirects>
   </ipv6>
-  <ipv6:static>
-    <address>
-      <local>2001:db8:0:1::5/64</local>
-    </address>
-  </ipv6:static>
+  <ipv6:dhcp>
+    <enabled>true</enabled>
+    <update>dns,nis,ntp,tz,boot</update>
+    <mode>auto</mode>
+    <rapid-commit>true</rapid-commit>
+    <hostname>dev3</hostname>
+    <defer-timeout>15</defer-timeout>
+    <recover-lease>true</recover-lease>
+    <refresh-lease>false</refresh-lease>
+    <release-lease>false</release-lease>
+  </ipv6:dhcp>
 </interface>
