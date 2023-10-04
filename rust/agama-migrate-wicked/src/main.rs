@@ -33,12 +33,12 @@ pub enum Commands {
         #[arg(value_enum, short, long, default_value_t = Format::Json)]
         format: Format,
 
-        /// Where wicked xml configs are located
+        /// Path to file or directory where the wicked xml config is located
         path: String,
     },
     /// Migrate wicked state at path
     Migrate {
-        /// Where wicked xml configs are located
+        /// Path to file or directory where the wicked xml config is located
         path: String,
     },
 }
