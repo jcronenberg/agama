@@ -1,4 +1,4 @@
-use crate::reader::read_dir as wicked_read_dir;
+use crate::reader::read as wicked_read;
 use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use std::error::Error;
 use std::path::PathBuf;
@@ -16,7 +16,7 @@ impl WickedAdapter {
 impl Adapter for WickedAdapter {
     fn read(&self) -> Result<model::NetworkState, Box<dyn std::error::Error>> {
         async_std::task::block_on(async {
-            let interfaces = wicked_read_dir(self.path.clone()).await?;
+            let interfaces = wicked_read(self.path.clone()).await?;
             let mut state = NetworkState::new(vec![], vec![]);
 
             for interface in interfaces {

@@ -19,10 +19,13 @@ fn replace_colons(colon_string: String) -> String {
     replaced
 }
 
-pub async fn read_dir(path: PathBuf) -> Result<Vec<Interface>, io::Error> {
-    let interfaces = fs::read_dir(path)?
-        .map(|res| res.map(|e| read_xml(e.path()).unwrap()).unwrap())
-        .flatten()
-        .collect::<Vec<_>>();
+pub async fn read(path: PathBuf) -> Result<Vec<Interface>, io::Error> {
+    let interfaces: Vec<Interface> = if path.is_dir() {
+        fs::read_dir(path)?
+            .flat_map(|res| res.map(|e| read_xml(e.path()).unwrap()).unwrap())
+            .collect::<Vec<_>>()
+    } else {
+        read_xml(path).unwrap()
+    };
     Ok(interfaces)
 }

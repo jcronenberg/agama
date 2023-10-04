@@ -1,7 +1,7 @@
 use crate::error::CliError;
 use crate::printers::{print, Format};
 use agama_migrate_wicked::migrate::migrate;
-use agama_migrate_wicked::reader::read_dir as wicked_read_dir;
+use agama_migrate_wicked::reader::read as wicked_read;
 use clap::Subcommand;
 use std::io;
 
@@ -22,7 +22,7 @@ pub async fn run(subcommand: WickedCommands, format: Format) -> anyhow::Result<(
     let command = parse_wicked_command(subcommand)?;
     match command {
         WickedAction::Show(path) => {
-            let interfaces = wicked_read_dir(path.into()).await?;
+            let interfaces = wicked_read(path.into()).await?;
             print(interfaces, io::stdout(), format)?;
             Ok(())
         }
