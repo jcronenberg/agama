@@ -13,7 +13,6 @@ name = "agama-cli"
 version = "1.0.0"
 dependencies = [
  "agama-lib",
- "agama-migrate-wicked",
  "agama-settings",
  "anyhow",
  "async-std",
@@ -99,8 +98,10 @@ version = "0.1.0"
 dependencies = [
  "agama-dbus-server",
  "agama-lib",
+ "anyhow",
  "async-std",
  "cidr",
+ "clap",
  "quick-xml",
  "regex",
  "serde",
