@@ -2,30 +2,40 @@ mod interface;
 mod migrate;
 mod reader;
 
-use clap::{Parser, Subcommand};
+use clap::builder::TypedValueParser;
+use clap::{Args, Parser, Subcommand};
+use log::*;
 use migrate::migrate;
 use reader::read as wicked_read;
 use std::process::{ExitCode, Termination};
-use log::*;
 
 #[derive(Parser)]
 #[command(name = "migrate-wicked", version, about, long_about = None)]
 struct Cli {
+    #[clap(flatten)]
+    global_opts: GlobalOpts,
+
     #[command(subcommand)]
     pub command: Commands,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Debug, Args)]
+struct GlobalOpts {
+    #[arg(long, global = true, default_value_t = LevelFilter::Error, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
+    pub log_level: LevelFilter,
+}
+
+#[derive(Subcommand)]
 pub enum Commands {
     /// Shows the current xml wicked configuration
     Show {
         /// Where wicked xml configs are located
-        path: String
+        path: String,
     },
     /// Migrate wicked state at path
     Migrate {
         /// Where wicked xml configs are located
-        path: String
+        path: String,
     },
 }
 
@@ -59,15 +69,15 @@ impl Termination for CliResult {
 
 #[async_std::main]
 async fn main() -> CliResult {
-    simplelog::TermLogger::init(
-            LevelFilter::Info,
-            simplelog::Config::default(),
-            simplelog::TerminalMode::Stderr,
-            simplelog::ColorChoice::Auto,
-        )
-        .unwrap();
-
     let cli = Cli::parse();
+
+    simplelog::TermLogger::init(
+        cli.global_opts.log_level,
+        simplelog::Config::default(),
+        simplelog::TerminalMode::Stderr,
+        simplelog::ColorChoice::Auto,
+    )
+    .unwrap();
 
     if let Err(error) = run_command(cli).await {
         eprintln!("{:?}", error);
