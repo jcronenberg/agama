@@ -106,6 +106,8 @@ dependencies = [
  "quick-xml",
  "regex",
  "serde",
+ "serde_json",
+ "serde_yaml",
  "simplelog",
 ]
 

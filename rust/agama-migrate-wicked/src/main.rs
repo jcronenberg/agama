@@ -29,6 +29,10 @@ struct GlobalOpts {
 pub enum Commands {
     /// Shows the current xml wicked configuration
     Show {
+        /// Format output
+        #[arg(value_enum, short, long, default_value_t = Format::Json)]
+        format: Format,
+
         /// Where wicked xml configs are located
         path: String,
     },
@@ -39,11 +43,26 @@ pub enum Commands {
     },
 }
 
+/// Supported output formats
+#[derive(clap::ValueEnum, Clone)]
+pub enum Format {
+    Json,
+    PrettyJson,
+    Yaml,
+    Text,
+}
+
 async fn run_command(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
-        Commands::Show { path } => {
+        Commands::Show { path, format } => {
             let interfaces = wicked_read(path.into()).await?;
-            println!("{:?}", interfaces);
+            let output: String = match format {
+                Format::Json => serde_json::to_string(&interfaces)?,
+                Format::PrettyJson => serde_json::to_string_pretty(&interfaces)?,
+                Format::Yaml => serde_yaml::to_string(&interfaces)?,
+                Format::Text => format!("{:?}", interfaces),
+            };
+            println!("{}", output);
             Ok(())
         }
         Commands::Migrate { path } => {
