@@ -2,7 +2,6 @@ use crate::config::ConfigCommands;
 use crate::logs::LogsCommands;
 use crate::profile::ProfileCommands;
 use crate::questions::QuestionsCommands;
-use crate::wicked::WickedCommands;
 use clap::Subcommand;
 
 #[derive(Subcommand, Debug)]
@@ -36,7 +35,4 @@ pub enum Commands {
     /// Collects logs
     #[command(subcommand)]
     Logs(LogsCommands),
-    /// Migrate wicked config
-    #[command(subcommand)]
-    Wicked(WickedCommands),
 }

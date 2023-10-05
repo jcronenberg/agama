@@ -8,7 +8,6 @@ mod printers;
 mod profile;
 mod progress;
 mod questions;
-mod wicked;
 
 use crate::error::CliError;
 use agama_lib::error::ServiceError;
@@ -27,7 +26,6 @@ use std::{
     thread::sleep,
     time::Duration,
 };
-use wicked::run as run_wicked_cmd;
 
 #[derive(Parser)]
 #[command(name = "agama", version, about, long_about = None)]
@@ -136,7 +134,6 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
         }
         Commands::Questions(subcommand) => block_on(run_questions_cmd(subcommand)),
         Commands::Logs(subcommand) => block_on(run_logs_cmd(subcommand)),
-        Commands::Wicked(subcommand) => block_on(run_wicked_cmd(subcommand, cli.format)),
         _ => unimplemented!(),
     }
 }
