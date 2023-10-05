@@ -41,6 +41,7 @@ pub fn post_process_interface(interfaces: &mut [Interface]) {
 pub async fn read(path: PathBuf) -> Result<Vec<Interface>, io::Error> {
     let mut interfaces: Vec<Interface> = if path.is_dir() {
         fs::read_dir(path)?
+            .filter(|r| !r.as_ref().unwrap().path().is_dir())
             .flat_map(|res| res.map(|e| read_xml(e.path()).unwrap()).unwrap())
             .collect::<Vec<_>>()
     } else {
