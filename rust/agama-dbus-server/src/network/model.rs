@@ -6,6 +6,7 @@ use crate::network::error::NetworkStateError;
 use agama_lib::network::types::{DeviceType, SSID};
 use cidr::IpInet;
 use std::{
+    collections::HashMap,
     default::Default,
     fmt,
     net::IpAddr,
@@ -219,6 +220,7 @@ pub enum Connection {
     Ethernet(EthernetConnection),
     Wireless(WirelessConnection),
     Loopback(LoopbackConnection),
+    Bond(BondConnection),
 }
 
 impl Connection {
@@ -234,6 +236,10 @@ impl Connection {
             }),
             DeviceType::Loopback => Connection::Loopback(LoopbackConnection { base }),
             DeviceType::Ethernet => Connection::Ethernet(EthernetConnection { base }),
+            DeviceType::Bond => Connection::Bond(BondConnection {
+                base,
+                ..Default::default()
+            }),
         }
     }
 
@@ -244,6 +250,7 @@ impl Connection {
             Connection::Ethernet(conn) => &conn.base,
             Connection::Wireless(conn) => &conn.base,
             Connection::Loopback(conn) => &conn.base,
+            Connection::Bond(conn) => &conn.base,
         }
     }
 
@@ -252,6 +259,7 @@ impl Connection {
             Connection::Ethernet(conn) => &mut conn.base,
             Connection::Wireless(conn) => &mut conn.base,
             Connection::Loopback(conn) => &mut conn.base,
+            Connection::Bond(conn) => &mut conn.base,
         }
     }
 
@@ -306,6 +314,37 @@ impl Connection {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum ParentKind {
+    Bond,
+}
+
+impl fmt::Display for ParentKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match &self {
+            ParentKind::Bond => "bond",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+impl FromStr for ParentKind {
+    type Err = NetworkStateError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "bond" => Ok(ParentKind::Bond),
+            _ => Err(NetworkStateError::UnknownParentKind(s.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Parent {
+    pub interface: String,
+    pub kind: ParentKind,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct BaseConnection {
     pub id: String,
@@ -314,6 +353,7 @@ pub struct BaseConnection {
     pub status: Status,
     pub interface: String,
     pub match_config: MatchConfig,
+    pub parent: Option<Parent>,
 }
 
 impl PartialEq for BaseConnection {
@@ -408,6 +448,17 @@ pub struct LoopbackConnection {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
+pub struct BondConnection {
+    pub base: BaseConnection,
+    pub bond: BondConfig,
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct BondConfig {
+    pub options: HashMap<String, String>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct WirelessConfig {
     pub mode: WirelessMode,
     pub ssid: SSID,
