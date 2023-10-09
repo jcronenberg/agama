@@ -1,22 +1,21 @@
 use crate::reader::read as wicked_read;
 use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use std::error::Error;
-use std::path::PathBuf;
 
 struct WickedAdapter {
-    path: PathBuf,
+    paths: Vec<String>,
 }
 
 impl WickedAdapter {
-    pub fn new(path: &str) -> Self {
-        Self { path: path.into() }
+    pub fn new(paths: Vec<String>) -> Self {
+        Self { paths }
     }
 }
 
 impl Adapter for WickedAdapter {
     fn read(&self) -> Result<model::NetworkState, Box<dyn std::error::Error>> {
         async_std::task::block_on(async {
-            let interfaces = wicked_read(self.path.clone()).await?;
+            let interfaces = wicked_read(self.paths.clone()).await?;
             let mut state = NetworkState::new(vec![], vec![]);
 
             for interface in interfaces {
@@ -32,8 +31,8 @@ impl Adapter for WickedAdapter {
     }
 }
 
-pub async fn migrate(path: String) -> Result<(), Box<dyn Error>> {
-    let wicked = WickedAdapter::new(&path);
+pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
+    let wicked = WickedAdapter::new(paths);
     let state = wicked.read()?;
     let nm = NetworkManagerAdapter::from_system().await?;
     nm.write(&state)?;
