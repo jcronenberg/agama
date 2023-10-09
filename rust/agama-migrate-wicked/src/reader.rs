@@ -38,15 +38,20 @@ pub fn post_process_interface(interfaces: &mut [Interface]) {
     }
 }
 
-pub async fn read(path: PathBuf) -> Result<Vec<Interface>, io::Error> {
-    let mut interfaces: Vec<Interface> = if path.is_dir() {
-        fs::read_dir(path)?
-            .filter(|r| !r.as_ref().unwrap().path().is_dir())
-            .flat_map(|res| res.map(|e| read_xml(e.path()).unwrap()).unwrap())
-            .collect::<Vec<_>>()
-    } else {
-        read_xml(path).unwrap()
-    };
+pub async fn read(paths: Vec<String>) -> Result<Vec<Interface>, io::Error> {
+    let mut interfaces: Vec<Interface> = vec![];
+    for path in paths {
+        let path: PathBuf = path.into();
+        let mut new_interfaces: Vec<Interface> = if path.is_dir() {
+            fs::read_dir(path)?
+                .filter(|r| !r.as_ref().unwrap().path().is_dir())
+                .flat_map(|res| res.map(|e| read_xml(e.path()).unwrap()).unwrap())
+                .collect::<Vec<_>>()
+        } else {
+            read_xml(path).unwrap()
+        };
+        interfaces.append(&mut new_interfaces);
+    }
     post_process_interface(&mut interfaces);
     Ok(interfaces)
 }

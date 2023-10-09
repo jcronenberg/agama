@@ -33,13 +33,13 @@ pub enum Commands {
         #[arg(value_enum, short, long, default_value_t = Format::Json)]
         format: Format,
 
-        /// Path to file or directory where the wicked xml config is located
-        path: String,
+        /// Wicked XML Files or directories where the wicked xml configs are located
+        paths: Vec<String>,
     },
     /// Migrate wicked state at path
     Migrate {
-        /// Path to file or directory where the wicked xml config is located
-        path: String,
+        /// Wicked XML Files or directories where the wicked xml configs are located
+        paths: Vec<String>,
     },
 }
 
@@ -54,8 +54,8 @@ pub enum Format {
 
 async fn run_command(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
-        Commands::Show { path, format } => {
-            let interfaces = wicked_read(path.into()).await?;
+        Commands::Show { paths, format } => {
+            let interfaces = wicked_read(paths).await?;
             let output: String = match format {
                 Format::Json => serde_json::to_string(&interfaces)?,
                 Format::PrettyJson => serde_json::to_string_pretty(&interfaces)?,
@@ -65,8 +65,8 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             println!("{}", output);
             Ok(())
         }
-        Commands::Migrate { path } => {
-            migrate(path).await.unwrap();
+        Commands::Migrate { paths } => {
+            migrate(paths).await.unwrap();
             Ok(())
         }
     }
