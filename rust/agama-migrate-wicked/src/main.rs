@@ -49,6 +49,7 @@ pub enum Format {
     Json,
     PrettyJson,
     Yaml,
+    Xml,
     Text,
 }
 
@@ -60,6 +61,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                 Format::Json => serde_json::to_string(&interfaces)?,
                 Format::PrettyJson => serde_json::to_string_pretty(&interfaces)?,
                 Format::Yaml => serde_yaml::to_string(&interfaces)?,
+                Format::Xml => quick_xml::se::to_string_with_root("interface", &interfaces)?,
                 Format::Text => format!("{:?}", interfaces),
             };
             println!("{}", output);

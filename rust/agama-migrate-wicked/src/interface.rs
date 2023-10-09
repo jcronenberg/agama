@@ -22,6 +22,8 @@ pub struct Interface {
     pub ipv6_auto: Option<Ipv6Auto>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bond: Option<Bond>,
+    #[serde(rename = "@origin")]
+    pub origin: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Clone, Deserialize)]
