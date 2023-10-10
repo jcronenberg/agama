@@ -5,7 +5,7 @@ use serde_with::{
     formats::CommaSeparator, serde_as, skip_serializing_none, DeserializeFromStr, SerializeDisplay,
     StringWithSeparator,
 };
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, net::IpAddr, str::FromStr};
 use strum_macros::{Display, EnumString};
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
@@ -72,18 +72,22 @@ pub struct Ipv6 {
     pub accept_redirects: bool,
 }
 
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
-#[serde(default)]
+#[skip_serializing_none]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4Static {
-    #[serde(rename = "address", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "address")]
     pub addresses: Option<Vec<Address>>,
+    #[serde(rename = "route")]
+    pub routes: Option<Vec<Route>>,
 }
 
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
-#[serde(default)]
+#[skip_serializing_none]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6Static {
-    #[serde(rename = "address", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "address")]
     pub addresses: Option<Vec<Address>>,
+    #[serde(rename = "route")]
+    pub routes: Option<Vec<Route>>,
 }
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
@@ -129,6 +133,20 @@ pub enum FailOverMac {
     None,
     Active,
     Follow,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+pub struct Route {
+    pub destination: Option<String>,
+    #[serde(rename = "nexthop")]
+    pub nexthops: Option<Vec<Nexthop>>,
+    pub priority: Option<u32>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Nexthop {
+    pub gateway: String,
 }
 
 #[derive(Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
@@ -471,10 +489,26 @@ impl From<&Interface> for IpConfig {
         .unwrap();
 
         let mut addresses: Vec<IpInet> = vec![];
+        let mut gateway4 = None;
+        let mut gateway6 = None;
         if let Some(ipv4_static) = &val.ipv4_static {
             if let Some(addresses_in) = &ipv4_static.addresses {
                 for addr in addresses_in {
                     addresses.push(IpInet::from_str(addr.local.as_str()).unwrap());
+                }
+            }
+            if let Some(routes) = &ipv4_static.routes {
+                for route in routes {
+                    if let Some(nexthops) = &route.nexthops {
+                        // TODO fix when implementing better route handling
+                        // the logged warning isn't really true for multiple hops
+                        // as gateways just can't have multiple nexthops AFAICT
+                        if gateway4.is_some() || nexthops.len() > 1 {
+                            log::warn!("Multiple gateways aren't supported yet");
+                        } else {
+                            gateway4 = Some(IpAddr::from_str(&nexthops[0].gateway).unwrap());
+                        }
+                    }
                 }
             }
         }
@@ -484,12 +518,28 @@ impl From<&Interface> for IpConfig {
                     addresses.push(IpInet::from_str(addr.local.as_str()).unwrap());
                 }
             }
+            if let Some(routes) = &ipv6_static.routes {
+                for route in routes {
+                    if let Some(nexthops) = &route.nexthops {
+                        // TODO fix when implementing better route handling
+                        // the logged warning isn't really true for multiple hops
+                        // as gateways just can't have multiple nexthops AFAICT
+                        if gateway6.is_some() || nexthops.len() > 1 {
+                            log::warn!("Multiple gateways aren't supported yet");
+                        } else {
+                            gateway6 = Some(IpAddr::from_str(&nexthops[0].gateway).unwrap());
+                        }
+                    }
+                }
+            }
         }
 
         IpConfig {
             addresses,
             method4,
             method6,
+            gateway4,
+            gateway6,
             ..Default::default()
         }
     }
@@ -510,6 +560,12 @@ mod tests {
                 addresses: Some(vec![Address {
                     local: "127.0.0.1/8".to_string(),
                 }]),
+                routes: Some(vec![Route {
+                    nexthops: Some(vec![Nexthop {
+                        gateway: "127.0.0.1".to_string(),
+                    }]),
+                    ..Default::default()
+                }]),
             }),
             ipv6: Ipv6 {
                 enabled: true,
@@ -518,6 +574,12 @@ mod tests {
             ipv6_static: Some(Ipv6Static {
                 addresses: Some(vec![Address {
                     local: "::1/128".to_string(),
+                }]),
+                routes: Some(vec![Route {
+                    nexthops: Some(vec![Nexthop {
+                        gateway: "::1".to_string(),
+                    }]),
+                    ..Default::default()
                 }]),
             }),
             ..Default::default()
@@ -539,6 +601,26 @@ mod tests {
                 .network_length()
                 .to_string(),
             "128"
+        );
+        assert!(static_connection.base().ip_config.gateway4.is_some());
+        assert_eq!(
+            static_connection
+                .base()
+                .ip_config
+                .gateway4
+                .unwrap()
+                .to_string(),
+            "127.0.0.1"
+        );
+        assert!(static_connection.base().ip_config.gateway6.is_some());
+        assert_eq!(
+            static_connection
+                .base()
+                .ip_config
+                .gateway6
+                .unwrap()
+                .to_string(),
+            "::1"
         );
     }
 
