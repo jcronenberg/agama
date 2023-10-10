@@ -71,13 +71,15 @@ pub struct Ipv6 {
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ipv4Static {
-    pub address: Address,
+    #[serde(rename = "address", skip_serializing_if = "Option::is_none")]
+    pub addresses: Option<Vec<Address>>,
 }
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ipv6Static {
-    pub address: Address,
+    #[serde(rename = "address", skip_serializing_if = "Option::is_none")]
+    pub addresses: Option<Vec<Address>>,
 }
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
@@ -272,15 +274,19 @@ impl From<&Interface> for IpConfig {
         .unwrap();
 
         let mut addresses: Vec<IpInet> = vec![];
-        if val.ipv4_static.is_some() {
-            addresses.push(
-                IpInet::from_str(val.ipv4_static.as_ref().unwrap().address.local.as_str()).unwrap(),
-            );
+        if let Some(ipv4_static) = &val.ipv4_static {
+            if let Some(addresses_in) = &ipv4_static.addresses {
+                for addr in addresses_in {
+                    addresses.push(IpInet::from_str(addr.local.as_str()).unwrap());
+                }
+            }
         }
-        if val.ipv6_static.is_some() {
-            addresses.push(
-                IpInet::from_str(val.ipv6_static.as_ref().unwrap().address.local.as_str()).unwrap(),
-            );
+        if let Some(ipv6_static) = &val.ipv6_static {
+            if let Some(addresses_in) = &ipv6_static.addresses {
+                for addr in addresses_in {
+                    addresses.push(IpInet::from_str(addr.local.as_str()).unwrap());
+                }
+            }
         }
 
         IpConfig {
@@ -304,18 +310,18 @@ mod tests {
                 ..Default::default()
             },
             ipv4_static: Some(Ipv4Static {
-                address: Address {
+                addresses: Some(vec![Address {
                     local: "127.0.0.1/8".to_string(),
-                },
+                }]),
             }),
             ipv6: Ipv6 {
                 enabled: true,
                 ..Default::default()
             },
             ipv6_static: Some(Ipv6Static {
-                address: Address {
+                addresses: Some(vec![Address {
                     local: "::1/128".to_string(),
-                },
+                }]),
             }),
             ..Default::default()
         };

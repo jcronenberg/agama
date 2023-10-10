@@ -18,5 +18,8 @@
     <address>
       <local>2001:db8:0:1::5/64</local>
     </address>
+    <address>
+      <local>2001:db8:0:2::5/64</local>
+    </address>
   </ipv6:static>
 </interface>
