@@ -1,8 +1,12 @@
 use agama_dbus_server::network::model::{self, IpConfig, IpMethod, Parent};
 use cidr::IpInet;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_with::{formats::CommaSeparator, serde_as, StringWithSeparator};
+use serde_with::{
+    formats::CommaSeparator, serde_as, skip_serializing_none, DeserializeFromStr, SerializeDisplay,
+    StringWithSeparator,
+};
 use std::{collections::HashMap, str::FromStr};
+use strum_macros::{Display, EnumString};
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -119,15 +123,24 @@ pub struct Ipv6Auto {
     pub update: Vec<String>,
 }
 
+#[derive(Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
+#[strum(serialize_all = "kebab_case")]
+pub enum FailOverMac {
+    None,
+    Active,
+    Follow,
+}
+
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+#[skip_serializing_none]
 pub struct Bond {
     pub mode: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub miimon: Option<Miimon>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub arpmon: Option<ArpMon>,
     #[serde(deserialize_with = "unwrap_slaves")]
     pub slaves: Vec<Slave>,
+    #[serde(rename = "fail-over-mac")]
+    pub fail_over_mac: Option<FailOverMac>,
 }
 
 impl Bond {
@@ -214,6 +227,10 @@ impl From<Bond> for HashMap<String, String> {
             if let Some(v) = &a.validate_target {
                 h.insert(String::from("arp_all_targets"), v.clone());
             }
+        }
+
+        if let Some(fom) = &bond.fail_over_mac {
+            h.insert(String::from("fail-over-mac"), fom.to_string());
         }
         h
     }
@@ -363,5 +380,17 @@ mod tests {
         assert_eq!(static_connection.base().ip_config.method4, IpMethod::Auto);
         assert_eq!(static_connection.base().ip_config.method6, IpMethod::Auto);
         assert_eq!(static_connection.base().ip_config.addresses.len(), 0);
+    }
+
+    #[test]
+    fn test_bond_options() {
+        let bond = Bond {
+            fail_over_mac: Some(FailOverMac::Active),
+            ..Default::default()
+        };
+
+        let bond: HashMap<String, String> = bond.into();
+        assert!(bond.contains_key("fail-over-mac"));
+        assert_eq!(bond.get("fail-over-mac").unwrap(), "active");
     }
 }
