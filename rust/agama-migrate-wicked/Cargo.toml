@@ -19,6 +19,7 @@ clap = { version = "4.1.4", features = ["derive", "wrap_help"] }
 anyhow = "1.0.71"
 log = "0.4"
 simplelog = "0.12.1"
+serde_with = "3.3.0"
 
 [[bin]]
 name = "migrate-wicked"

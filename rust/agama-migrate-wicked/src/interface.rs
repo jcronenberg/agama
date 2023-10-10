@@ -1,6 +1,7 @@
 use agama_dbus_server::network::model::{self, IpConfig, IpMethod, Parent};
 use cidr::IpInet;
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_with::{formats::CommaSeparator, serde_as, StringWithSeparator};
 use std::{collections::HashMap, str::FromStr};
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
@@ -22,6 +23,8 @@ pub struct Interface {
     pub ipv6_auto: Option<Ipv6Auto>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bond: Option<Bond>,
+    #[serde(rename = "@origin")]
+    pub origin: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Clone, Deserialize)]
@@ -83,12 +86,13 @@ pub struct Address {
     pub local: String,
 }
 
+#[serde_as]
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ipv6Dhcp {
     pub enabled: bool,
     pub flags: String,
-    #[serde(deserialize_with = "comma_separated_string_deserialize")]
+    #[serde_as(as = "StringWithSeparator::<CommaSeparator, String>")]
     pub update: Vec<String>,
     pub mode: String,
     #[serde(rename = "rapid-commit")]
@@ -104,24 +108,13 @@ pub struct Ipv6Dhcp {
     pub release_lease: bool,
 }
 
+#[serde_as]
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ipv6Auto {
     pub enabled: bool,
-    #[serde(deserialize_with = "comma_separated_string_deserialize")]
+    #[serde_as(as = "StringWithSeparator::<CommaSeparator, String>")]
     pub update: Vec<String>,
-}
-
-// https://stackoverflow.com/questions/54006221/how-can-i-deserialize-a-comma-separated-json-string-as-a-vector-of-separate-stri
-fn comma_separated_string_deserialize<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str_sequence = String::deserialize(deserializer)?;
-    Ok(str_sequence
-        .split(',')
-        .map(|item| item.to_owned())
-        .collect())
 }
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
