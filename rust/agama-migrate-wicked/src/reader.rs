@@ -6,17 +6,18 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-pub fn read_xml(path: PathBuf) -> Result<Vec<Interface>, quick_xml::DeError> {
-    let contents = fs::read_to_string(path).expect("Should have been able to read the file");
-    // TODO better error handling when xml parsing failed
-    from_str(replace_colons(contents).as_str())
+pub fn read_xml(str: &str) -> Result<Vec<Interface>, quick_xml::DeError> {
+    from_str(replace_colons(str).as_str())
 }
 
-fn replace_colons(colon_string: String) -> String {
+pub fn read_xml_file(path: PathBuf) -> Result<Vec<Interface>, quick_xml::DeError> {
+    let contents = fs::read_to_string(path).expect("Should have been able to read the file");
+    read_xml(contents.as_str())
+}
+
+fn replace_colons(colon_string: &str) -> String {
     let re = Regex::new(r"<([\/]?)(\w+):(\w+)\b").unwrap();
-    let replaced = re
-        .replace_all(colon_string.as_str(), "<$1$2-$3")
-        .to_string();
+    let replaced = re.replace_all(colon_string, "<$1$2-$3").to_string();
     replaced
 }
 
@@ -45,13 +46,41 @@ pub async fn read(paths: Vec<String>) -> Result<Vec<Interface>, io::Error> {
         let mut new_interfaces: Vec<Interface> = if path.is_dir() {
             fs::read_dir(path)?
                 .filter(|r| !r.as_ref().unwrap().path().is_dir())
-                .flat_map(|res| res.map(|e| read_xml(e.path()).unwrap()).unwrap())
+                .flat_map(|res| res.map(|e| read_xml_file(e.path()).unwrap()).unwrap())
                 .collect::<Vec<_>>()
         } else {
-            read_xml(path).unwrap()
+            read_xml_file(path).unwrap()
         };
         interfaces.append(&mut new_interfaces);
     }
     post_process_interface(&mut interfaces);
     Ok(interfaces)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bond_option_fail_over_mac() {
+        let xml = r##"
+            <interface>
+                <name>bond0</name>
+                <bond>
+                    <mode>active-backup</mode>
+                    <fail-over-mac>none</fail-over-mac>
+                    <slaves>
+                        <slave><device>en0</device></slave>
+                    </slaves>
+                </bond>
+            </interface>
+            "##;
+        let ifc = read_xml(xml).unwrap().pop().unwrap();
+        assert!(ifc.bond.is_some());
+        let bond = ifc.bond.unwrap();
+        assert_eq!(
+            bond.fail_over_mac,
+            Some(crate::interface::FailOverMac::None)
+        );
+    }
 }
