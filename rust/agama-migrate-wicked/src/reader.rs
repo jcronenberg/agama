@@ -103,4 +103,18 @@ mod tests {
             Some(crate::interface::FailOverMac::None)
         );
     }
+
+    #[test]
+    fn test_broken_xml() {
+        let xml = r##"
+            <interface>
+                <name>eth1</name>
+                <ipv4:static>
+                  <address>127.0.0.1</>
+                </ipv4:static>
+            </interface>
+            "##;
+        let err = read_xml(xml);
+        assert!(err.is_err());
+    }
 }
