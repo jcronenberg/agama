@@ -2,9 +2,8 @@ use crate::interface::{Interface, ParentKind};
 use quick_xml::de::from_str;
 use regex::Regex;
 use std::collections::HashMap;
-use std::fs;
-use std::io;
-use std::path::PathBuf;
+use std::fs::{self, read_dir};
+use std::path::{Path, PathBuf};
 
 pub fn read_xml(str: &str) -> Result<Vec<Interface>, quick_xml::DeError> {
     from_str(replace_colons(str).as_str())
@@ -39,19 +38,40 @@ pub fn post_process_interface(interfaces: &mut [Interface]) {
     }
 }
 
-pub async fn read(paths: Vec<String>) -> Result<Vec<Interface>, io::Error> {
+// https://stackoverflow.com/a/76820878
+fn recurse_files(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
+    let mut buf = vec![];
+    let entries = read_dir(path)?;
+
+    for entry in entries {
+        let entry = entry?;
+        let meta = entry.metadata()?;
+
+        if meta.is_dir() {
+            let mut subdir = recurse_files(entry.path())?;
+            buf.append(&mut subdir);
+        }
+
+        if meta.is_file() {
+            buf.push(entry.path());
+        }
+    }
+
+    Ok(buf)
+}
+
+pub fn read(paths: Vec<String>) -> Result<Vec<Interface>, anyhow::Error> {
     let mut interfaces: Vec<Interface> = vec![];
     for path in paths {
         let path: PathBuf = path.into();
-        let mut new_interfaces: Vec<Interface> = if path.is_dir() {
-            fs::read_dir(path)?
-                .filter(|r| !r.as_ref().unwrap().path().is_dir())
-                .flat_map(|res| res.map(|e| read_xml_file(e.path()).unwrap()).unwrap())
-                .collect::<Vec<_>>()
+        if path.is_dir() {
+            let files = recurse_files(path)?;
+            for file in files {
+                interfaces.append(&mut read_xml_file(file)?);
+            }
         } else {
-            read_xml_file(path).unwrap()
-        };
-        interfaces.append(&mut new_interfaces);
+            interfaces.append(&mut read_xml_file(path)?);
+        }
     }
     post_process_interface(&mut interfaces);
     Ok(interfaces)

@@ -15,7 +15,7 @@ impl WickedAdapter {
 impl Adapter for WickedAdapter {
     fn read(&self) -> Result<model::NetworkState, Box<dyn std::error::Error>> {
         async_std::task::block_on(async {
-            let interfaces = wicked_read(self.paths.clone()).await?;
+            let interfaces = wicked_read(self.paths.clone())?;
             let mut state = NetworkState::new(vec![], vec![]);
 
             for interface in interfaces {
