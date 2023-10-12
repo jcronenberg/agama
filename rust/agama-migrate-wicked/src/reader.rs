@@ -9,9 +9,18 @@ pub fn read_xml(str: &str) -> Result<Vec<Interface>, quick_xml::DeError> {
     from_str(replace_colons(str).as_str())
 }
 
-pub fn read_xml_file(path: PathBuf) -> Result<Vec<Interface>, quick_xml::DeError> {
-    let contents = fs::read_to_string(path).expect("Should have been able to read the file");
-    read_xml(contents.as_str())
+pub fn read_xml_file(path: PathBuf) -> Result<Vec<Interface>, anyhow::Error> {
+    let contents = match fs::read_to_string(path.clone()) {
+        Ok(contents) => contents,
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "Couldn't read {}: {}",
+                path.as_path().display(),
+                e
+            ))
+        }
+    };
+    Ok(read_xml(contents.as_str())?)
 }
 
 fn replace_colons(colon_string: &str) -> String {
