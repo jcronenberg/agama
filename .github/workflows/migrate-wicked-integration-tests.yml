@@ -1,0 +1,26 @@
+name: "migrate-wicked CI - Integration Tests"
+
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+    steps:
+    - name: Git Checkout
+      uses: actions/checkout@v3
+
+    - name: Start container
+      run: podman run --privileged --detach --name migrate-wicked --ipc=host -e CARGO_TERM_COLOR=always -v /dev:/dev -v .:/checkout registry.opensuse.org/home/jcronenberg/github-ci/containers/opensuse/migrate-wicked-testing:latest
+
+    - name: Build migrate-wicked
+      run: podman exec migrate-wicked bash -c "cd /checkout/rust/agama-migrate-wicked/ && cargo build"
+
+    - name: Run migration integration tests
+      run: podman exec migrate-wicked bash -c "/checkout/rust/agama-migrate-wicked/tests/test.sh"
