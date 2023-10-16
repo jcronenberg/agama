@@ -56,7 +56,7 @@ pub enum Format {
 async fn run_command(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Commands::Show { paths, format } => {
-            let interfaces = wicked_read(paths).await?;
+            let interfaces = wicked_read(paths)?;
             let output: String = match format {
                 Format::Json => serde_json::to_string(&interfaces)?,
                 Format::PrettyJson => serde_json::to_string_pretty(&interfaces)?,
