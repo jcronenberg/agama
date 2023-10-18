@@ -89,27 +89,93 @@ pub fn read(paths: Vec<String>) -> Result<Vec<Interface>, anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::interface::*;
 
     #[test]
-    fn test_bond_option_fail_over_mac() {
+    fn test_bond_options_from_xml() {
         let xml = r##"
             <interface>
                 <name>bond0</name>
                 <bond>
                     <mode>active-backup</mode>
+                    <xmit-hash-policy>layer34</xmit-hash-policy>
                     <fail-over-mac>none</fail-over-mac>
+                    <packets-per-slave>1</packets-per-slave>
+                    <tlb-dynamic-lb>true</tlb-dynamic-lb>
+                    <lacp-rate>slow</lacp-rate>
+                    <ad-select>bandwidth</ad-select>
+                    <ad-user-port-key>5</ad-user-port-key>
+                    <ad-actor-sys-prio>7</ad-actor-sys-prio>
+                    <ad-actor-system>00:de:ad:be:ef:00</ad-actor-system>
+                    <min-links>11</min-links>
+                    <primary-reselect>better</primary-reselect>
+                    <num-grat-arp>13</num-grat-arp>
+                    <num-usol-na>17</num-usol-na>
+                    <lp-interval>19</lp-interval>
+                    <resend-igmp>23</resend-igmp>
+                    <all-slaves-active>true</all-slaves-active>
                     <slaves>
                         <slave><device>en0</device></slave>
                     </slaves>
+                    <miimon>
+                        <frequency>23</frequency>
+                        <updelay>27</updelay>
+                        <downdelay>31</downdelay>
+                        <carrier-detect>ioctl</carrier-detect>
+                    </miimon>
+                    <arpmon>
+                        <interval>23</interval>
+                        <validate>filter_backup</validate>
+                        <validate-targets>any</validate-targets>
+                        <targets>
+                            <ipv4-address>1.2.3.4</ipv4-address>
+                            <ipv4-address>4.3.2.1</ipv4-address>
+                        </targets>
+                    </arpmon>
                 </bond>
             </interface>
             "##;
         let ifc = read_xml(xml).unwrap().pop().unwrap();
         assert!(ifc.bond.is_some());
         let bond = ifc.bond.unwrap();
+
         assert_eq!(
-            bond.fail_over_mac,
-            Some(crate::interface::FailOverMac::None)
+            bond,
+            Bond {
+                mode: BondMode::ActiveBackup,
+                xmit_hash_policy: Some(XmitHashPolicy::Layer34),
+                fail_over_mac: Some(FailOverMac::None),
+                packets_per_slave: Some(1),
+                tlb_dynamic_lb: Some(true),
+                lacp_rate: Some(LacpRate::Slow),
+                ad_select: Some(AdSelect::Bandwidth),
+                ad_user_port_key: Some(5),
+                ad_actor_sys_prio: Some(7),
+                ad_actor_system: Some(String::from("00:de:ad:be:ef:00")),
+                min_links: Some(11),
+                primary_reselect: Some(PrimaryReselect::Better),
+                num_grat_arp: Some(13),
+                num_usol_na: Some(17),
+                lp_interval: Some(19),
+                resend_igmp: Some(23),
+                all_slaves_active: Some(true),
+                slaves: vec![Slave {
+                    device: String::from("en0"),
+                    primary: None
+                }],
+                miimon: Some(Miimon {
+                    frequency: 23,
+                    carrier_detect: CarrierDetect::Ioctl,
+                    downdelay: Some(31),
+                    updelay: Some(27),
+                }),
+                arpmon: Some(ArpMon {
+                    interval: 23,
+                    validate: ArpValidate::FilterBackup,
+                    validate_targets: Some(ArpValidateTargets::Any),
+                    targets: vec![String::from("1.2.3.4"), String::from("4.3.2.1")]
+                }),
+            }
         );
     }
 
