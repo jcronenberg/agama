@@ -229,7 +229,7 @@ pub struct Bond {
     /* only on mode=active-backup */
     pub num_grat_arp: Option<u32>,
     /* only on mode=active-backup */
-    pub num_usol_na: Option<u32>,
+    pub num_unsol_na: Option<u32>,
     /* only on mode=[balance_tlb|balance_alb] */
     pub lp_interval: Option<u32>,
     /* only on mode=[balance_tlb|balance_alb|balance_RR|active-backup] */
@@ -336,7 +336,7 @@ impl From<Bond> for HashMap<String, String> {
         if let Some(m) = &bond.miimon {
             h.insert(String::from("miimon"), format!("{}", m.frequency));
             h.insert(
-                String::from("carrier_detect"),
+                String::from("use_carrier"),
                 match m.carrier_detect {
                     CarrierDetect::Ioctl => 0,
                     CarrierDetect::Netif => 1,
@@ -414,8 +414,8 @@ impl From<Bond> for HashMap<String, String> {
         if let Some(v) = &bond.num_grat_arp {
             h.insert(String::from("num_grat_arp"), v.to_string());
         }
-        if let Some(v) = &bond.num_usol_na {
-            h.insert(String::from("num_usol_na"), v.to_string());
+        if let Some(v) = &bond.num_unsol_na {
+            h.insert(String::from("num_unsol_na"), v.to_string());
         }
         if let Some(v) = &bond.lp_interval {
             h.insert(String::from("lp_interval"), v.to_string());
@@ -660,7 +660,7 @@ mod tests {
             min_links: Some(3),
             primary_reselect: Some(PrimaryReselect::Better),
             num_grat_arp: Some(7),
-            num_usol_na: Some(13),
+            num_unsol_na: Some(13),
             lp_interval: Some(17),
             resend_igmp: Some(19),
             all_slaves_active: Some(true),
@@ -693,13 +693,13 @@ mod tests {
             ("primary_reselect", String::from("better")),
             ("fail_over_mac", String::from("active")),
             ("num_grat_arp", 7.to_string()),
-            ("num_usol_na", 13.to_string()),
+            ("num_unsol_na", 13.to_string()),
             ("lp_interval", 17.to_string()),
             ("resend_igmp", 19.to_string()),
             ("all_slaves_active", 1.to_string()),
             // miimon
             ("miimon", 42.to_string()),
-            ("carrier_detect", 1.to_string()),
+            ("use_carrier", 1.to_string()),
             ("downdelay", 23.to_string()),
             ("updelay", 5.to_string()),
             // arpmon

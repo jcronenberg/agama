@@ -110,7 +110,7 @@ mod tests {
                     <min-links>11</min-links>
                     <primary-reselect>better</primary-reselect>
                     <num-grat-arp>13</num-grat-arp>
-                    <num-usol-na>17</num-usol-na>
+                    <num-unsol-na>17</num-unsol-na>
                     <lp-interval>19</lp-interval>
                     <resend-igmp>23</resend-igmp>
                     <all-slaves-active>true</all-slaves-active>
@@ -155,7 +155,7 @@ mod tests {
                 min_links: Some(11),
                 primary_reselect: Some(PrimaryReselect::Better),
                 num_grat_arp: Some(13),
-                num_usol_na: Some(17),
+                num_unsol_na: Some(17),
                 lp_interval: Some(19),
                 resend_igmp: Some(23),
                 all_slaves_active: Some(true),
