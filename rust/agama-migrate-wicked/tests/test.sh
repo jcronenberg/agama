@@ -1,6 +1,7 @@
 #!/bin/bash
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+BOLD='\033[1m'
 NC='\033[0m'
 RESULT=0
 MIGRATE_WICKED_BIN=../../target/debug/migrate-wicked
@@ -17,13 +18,22 @@ if [[ $(ls -A /etc/NetworkManager/system-connections/) ]]; then
     exit 1
 fi
 
+nm_connections="$(nmcli connection  | tail -n +2 | awk '{print $1}')";
+nm_cleanup() {
+    for i in $(nmcli connection  | tail -n +2 | awk '{print $1}'); do
+        if ! printf '%s\0' "${nm_connections[@]}" | grep -qwz $i; then
+            nmcli connection delete "$i"
+        fi
+    done
+}
+
 if [ ! -f $MIGRATE_WICKED_BIN ]; then
     echo -e "${RED}No migrate-wicked binary found${NC}"
     exit 1
 fi
 
 for test_dir in ${TEST_DIRS}; do
-    echo "Testing ${test_dir}"
+    echo -e "${BOLD}Testing ${test_dir}${NC}"
     $MIGRATE_WICKED_BIN show $test_dir/wicked_xml
     if [ $? -ne 0 ]; then
         error_msg ${test_dir} "show failed"
@@ -44,7 +54,7 @@ for test_dir in ${TEST_DIRS}; do
             echo -e "${GREEN}Migration for connection ${cmp_file/\.*/} successful${NC}"
         fi
     done
-    rm -f /etc/NetworkManager/system-connections/*
+    nm_cleanup
 done
 
 if [ $RESULT -eq 0 ]; then
