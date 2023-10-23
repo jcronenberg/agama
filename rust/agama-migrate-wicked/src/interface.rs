@@ -484,10 +484,11 @@ impl From<&Interface> for IpConfig {
         .unwrap();
         let method6 = Ipv6Method::from_str(if val.ipv6.enabled && val.ipv6_static.is_some() {
             "manual"
-        // currently not implemented by agama
-        // FIXME uncomment when implemented
-        // } else if val.ipv6.enabled && val.ipv6_dhcp.is_some() && val.ipv6_dhcp.as_ref().unwrap().mode == "managed" {
-        //     "dhcp"
+        } else if val.ipv6.enabled
+            && val.ipv6_dhcp.is_some()
+            && val.ipv6_dhcp.as_ref().unwrap().mode == "managed"
+        {
+            "dhcp"
         } else if !val.ipv6.enabled {
             "disabled"
         } else {
