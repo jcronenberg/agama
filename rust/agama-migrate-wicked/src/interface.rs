@@ -235,6 +235,7 @@ pub struct Bond {
     /* only on mode=[balance_tlb|balance_alb|balance_RR|active-backup] */
     pub resend_igmp: Option<u32>,
     pub all_slaves_active: Option<bool>,
+    pub address: Option<String>,
 }
 
 impl Bond {
@@ -324,8 +325,8 @@ where
     Ok(Slaves::deserialize(deserializer)?.slave)
 }
 
-impl From<Bond> for HashMap<String, String> {
-    fn from(bond: Bond) -> HashMap<String, String> {
+impl From<Bond> for model::BondConfig {
+    fn from(bond: Bond) -> model::BondConfig {
         let mut h: HashMap<String, String> = HashMap::new();
 
         h.insert(String::from("mode"), bond.mode.to_string());
@@ -430,7 +431,13 @@ impl From<Bond> for HashMap<String, String> {
             );
         }
 
-        h
+        model::BondConfig {
+            options: h,
+            hwaddr: match bond.address {
+                Some(s) => model::MacAddr::try_from(s.as_ref()).ok(),
+                _ => None,
+            },
+        }
     }
 }
 
@@ -457,7 +464,7 @@ impl From<Interface> for model::Connection {
         if let Some(b) = ifc.bond {
             model::Connection::Bond(model::BondConnection {
                 base,
-                bond: model::BondConfig { options: b.into() },
+                bond: b.into(),
             })
         } else {
             model::Connection::Ethernet(model::EthernetConnection { base })
@@ -677,9 +684,10 @@ mod tests {
                 targets: vec![String::from("1.2.3.4"), String::from("4.3.2.1")],
             }),
             slaves: vec![],
+            address: Some(String::from("02:11:22:33:44:55")),
         };
 
-        let bond: HashMap<String, String> = bond.into();
+        let bondconfig: model::BondConfig = bond.into();
         let s = HashMap::from([
             ("xmit_hash_policy", String::from("encap34")),
             ("packets_per_slave", 23.to_string()),
@@ -711,18 +719,23 @@ mod tests {
 
         for (k, v) in s.iter() {
             assert!(
-                bond.contains_key(*k),
+                bondconfig.options.contains_key(*k),
                 "Missing key '{}' in bond hash {:?}",
                 *k,
-                bond
+                bondconfig
             );
             assert_eq!(
-                bond.get(*k).unwrap(),
+                bondconfig.options.get(*k).unwrap(),
                 v,
                 "Unexpected value '{}' in key '{}'",
                 *k,
                 v
             );
         }
+
+        assert_eq!(
+            bondconfig.hwaddr.unwrap().data,
+            [0x02, 0x11, 0x22, 0x33, 0x44, 0x55]
+        );
     }
 }

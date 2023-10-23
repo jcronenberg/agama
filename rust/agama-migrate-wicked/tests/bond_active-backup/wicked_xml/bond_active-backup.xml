@@ -21,6 +21,7 @@
         <device>en1</device>
       </slave>
     </slaves>
+    <address>02:00:33:44:55:11</address>
   </bond>
   <link/>
   <ipv4>
