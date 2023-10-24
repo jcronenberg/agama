@@ -43,10 +43,6 @@ const FooterInfoArea = createTeleporter();
  * it is mounted only once and gets influenced by other components by using the created
  * slots (Title, PageIcon, MainActions, etc).
  *
- * So, please ensure that {@link test-utils!mockLayout } gets updated when adding or deleting
- * slots here. It's needed in order to allow testing the output of components that interact
- * with the layout using that mechanism.
- *
  * @example
  *   <Layout>
  *     <PageIcon><DashboardIcon /></PageIcon>
@@ -68,7 +64,7 @@ const FooterInfoArea = createTeleporter();
  */
 function Layout({ children }) {
   return (
-    <div className="wrapper shadow">
+    <div id="agama-main-wrapper" className="wrapper shadow">
       <header className="split justify-between bottom-shadow">
         <h1 className="split">
           <HeaderIcon.Target as="span" />
@@ -76,8 +72,8 @@ function Layout({ children }) {
         </h1>
 
         <div className="split">
-          <PageActions.Target as="span" />
-          <HeaderActions.Target as="span" />
+          <PageActions.Target as="div" />
+          <HeaderActions.Target as="div" />
         </div>
 
       </header>

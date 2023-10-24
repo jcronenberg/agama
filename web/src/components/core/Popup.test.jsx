@@ -39,7 +39,7 @@ const TestingPopup = (props) => {
     <Popup
       title="Testing Popup component"
       isOpen={isOpen}
-      { ...props }
+      {...props}
     >
       <p>The Popup Content</p>
       <button onClick={() => setIsMounted(false)}>Unmount Popup</button>
@@ -70,47 +70,26 @@ describe("Popup", () => {
       isOpen = true;
     });
 
-    it("renders the popup content inside a PF4/Modal", async () => {
+    it("renders the popup content inside a PF/Modal", async () => {
       installerRender(<TestingPopup />);
 
       const dialog = await screen.findByRole("dialog");
-      expect(dialog.classList.contains("pf-c-modal-box")).toBe(true);
+      expect(dialog.classList.contains("pf-v5-c-modal-box")).toBe(true);
 
       within(dialog).getByText("The Popup Content");
     });
 
-    it("renders the popup actions inside a PF4/Modal footer", async () => {
+    it("renders the popup actions inside a PF/Modal footer", async () => {
       installerRender(<TestingPopup />);
 
       const dialog = await screen.findByRole("dialog");
-      // NOTE: Sadly, PF4 Modal/ModalFooter does not have a footer or navigation role.
+      // NOTE: Sadly, PF Modal/ModalFooter does not have a footer or navigation role.
       // So, using https://developer.mozilla.org/es/docs/Web/API/Document/querySelector
       // for getting the footer. See https://github.com/testing-library/react-testing-library/issues/417 too.
       const footer = dialog.querySelector("footer");
 
       within(footer).getByText("Confirm");
       within(footer).getByText("Cancel");
-    });
-
-    it("removes aria-hidden attributes from body children (workaround for patternfly/patternfly-react#9096)", async () => {
-      const { user } = installerRender(
-        <>
-          <article>Popup Sibling</article>
-          <TestingPopup />
-        </>,
-        // Force React Testing Library to render the component directly in the
-        // body for emulating the default behavior of the PF4/Modal when no
-        // appendTo prop is given.
-        // https://testing-library.com/docs/react-testing-library/api/#container
-        { container: document.body }
-      );
-
-      await screen.findByRole("dialog");
-      const sibling = screen.getByText("Popup Sibling");
-      const unmountButton = await screen.getByRole("button", { name: "Unmount Popup" });
-      expect(sibling).toHaveAttribute("aria-hidden");
-      await user.click(unmountButton);
-      expect(sibling).not.toHaveAttribute("aria-hidden");
     });
   });
 });

@@ -20,27 +20,25 @@
  */
 
 import React from "react";
-import { screen, fireEvent } from "@testing-library/react";
-import { plainRender, mockLayout } from "~/test-utils";
+import { screen } from "@testing-library/react";
+import { plainRender } from "~/test-utils";
 import { PageOptions } from "~/components/core";
-
-jest.mock("~/components/layout/Layout", () => mockLayout());
 
 it("renders the component initially closed", async () => {
   plainRender(
     <PageOptions>
-      <PageOptions.Item>A dummy action</PageOptions.Item>
+      <PageOptions.Option>A dummy action</PageOptions.Option>
     </PageOptions>
   );
 
   expect(screen.queryByRole("menuitem", { name: "A dummy action" })).toBeNull();
 });
 
-it("show and hide the component content on user request", async () => {
+it("shows and hides the component content on user request", async () => {
   const { user } = plainRender(
     <PageOptions>
-      <PageOptions.Item><>A dummy action</></PageOptions.Item>
-    </PageOptions>
+      <PageOptions.Option><>A dummy action</></PageOptions.Option>
+    </PageOptions>, { layout: true }
   );
 
   const toggler = screen.getByRole("button");
@@ -56,15 +54,15 @@ it("show and hide the component content on user request", async () => {
   expect(screen.queryByRole("menuitem", { name: "A dummy action" })).toBeNull();
 });
 
-it("hide the component content when the user clicks on one of its actions", async () => {
+it("hides the component content when user clicks on one of its actions", async () => {
   const { user } = plainRender(
     <PageOptions>
       <PageOptions.Group label="Refresh">
-        <PageOptions.Item><>Section</></PageOptions.Item>
-        <PageOptions.Item><>Page</></PageOptions.Item>
+        <PageOptions.Option><>Section</></PageOptions.Option>
+        <PageOptions.Option><>Page</></PageOptions.Option>
       </PageOptions.Group>
-      <PageOptions.Item><>Exit</></PageOptions.Item>
-    </PageOptions>
+      <PageOptions.Option><>Exit</></PageOptions.Option>
+    </PageOptions>, { layout: true }
   );
 
   const toggler = screen.getByRole("button");
@@ -75,24 +73,29 @@ it("hide the component content when the user clicks on one of its actions", asyn
   expect(screen.queryByRole("menuitem", { name: "A dummy action" })).toBeNull();
 });
 
-it('should close the dropdown on click outside', async () => {
+it('closes the component  when user clicks outside', async () => {
   const { user } = plainRender(
-    <PageOptions>
-      <PageOptions.Item><>Item 1</></PageOptions.Item>
-      <PageOptions.Item><>Item 2</></PageOptions.Item>
-    </PageOptions>
+    <>
+      <div>Sibling</div>
+      <PageOptions>
+        <PageOptions.Option><>Option 1</></PageOptions.Option>
+        <PageOptions.Option><>Option 2</></PageOptions.Option>
+      </PageOptions>
+    </>, { layout: true }
   );
 
-  // Open the dropdown
   const toggler = screen.getByRole("button");
+  const sibling = screen.getByText("Sibling");
+
+  // Open the dropdown
   await user.click(toggler);
 
   // Ensure the dropdown is open
-  screen.getByRole("menuitem", { name: "Item 2" });
+  screen.getByRole("menuitem", { name: "Option 2" });
 
   // Click outside the dropdown
-  fireEvent.click(document);
+  await user.click(sibling);
 
   // Ensure the dropdown is closed
-  expect(screen.queryByRole("menuitem", { name: "Item 2" })).toBeNull();
+  expect(screen.queryByRole("menuitem", { name: "Option 2" })).toBeNull();
 });

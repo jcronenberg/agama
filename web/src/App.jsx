@@ -1,5 +1,5 @@
 /*
- * Copyright (c) [2022] SUSE LLC
+ * Copyright (c) [2022-2023] SUSE LLC
  *
  * All Rights Reserved.
  *
@@ -23,12 +23,13 @@ import React, { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 
 import { _ } from "~/i18n";
-import { useInstallerClient } from "~/context/installer";
+import { useInstallerClient, useInstallerClientStatus } from "~/context/installer";
 import { STARTUP, INSTALL } from "~/client/phase";
 import { BUSY } from "~/client/status";
 
 import {
   About,
+  DBusError,
   Disclosure,
   Installation,
   IssuesLink,
@@ -39,13 +40,26 @@ import {
   Sidebar
 } from "~/components/core";
 import { ChangeProductLink } from "~/components/software";
-import { Layout, Title, DBusError } from "~/components/layout";
+import { LanguageSwitcher } from "./components/l10n";
+import { Layout, Loading, Title } from "./components/layout";
+import { useL10n } from "./context/l10n";
 
+// D-Bus connection attempts before displaying an error.
+const ATTEMPTS = 3;
+
+/**
+ * Main application component.
+ *
+ * @param {object} props
+ * @param {number} [props.max_attempts=3] - Connection attempts before displaying an
+ *   error (3 by default). The component will keep trying to connect.
+ */
 function App() {
   const client = useInstallerClient();
+  const { attempt } = useInstallerClientStatus();
+  const { language } = useL10n();
   const [status, setStatus] = useState(undefined);
   const [phase, setPhase] = useState(undefined);
-  const [error, setError] = useState(undefined);
 
   useEffect(() => {
     const loadPhase = async () => {
@@ -55,21 +69,19 @@ function App() {
       setStatus(status);
     };
 
-    loadPhase().catch(setError);
-  }, [client.manager, setPhase, setStatus, setError]);
+    if (client) loadPhase().catch(console.error);
+  }, [client, setPhase, setStatus]);
 
   useEffect(() => {
-    return client.manager.onPhaseChange(setPhase);
-  }, [client.manager, setPhase]);
-
-  useEffect(() => {
-    return client.monitor.onConnectionChange(connected => {
-      connected ? location.reload() : setError(true);
-    });
-  }, [client.monitor, setError]);
+    if (client) {
+      return client.manager.onPhaseChange(setPhase);
+    }
+  }, [client, setPhase]);
 
   const Content = () => {
-    if (error) return <DBusError />;
+    if (!client) {
+      return (attempt > ATTEMPTS) ? <DBusError /> : <Loading />;
+    }
 
     if ((phase === STARTUP && status === BUSY) || phase === undefined || status === undefined) {
       return <LoadingEnvironment onStatusChange={setStatus} />;
@@ -85,21 +97,28 @@ function App() {
   return (
     <>
       <Sidebar>
-        <ChangeProductLink />
-        <IssuesLink />
-        <Disclosure label={_("Diagnostic tools")} data-keep-sidebar-open>
-          <ShowLogButton />
-          <LogsButton data-keep-sidebar-open="true" />
-          <ShowTerminalButton />
-        </Disclosure>
-        <About />
+        <div className="flex-stack">
+          <ChangeProductLink />
+          <IssuesLink />
+          <Disclosure label={_("Diagnostic tools")} data-keep-sidebar-open>
+            <ShowLogButton />
+            <LogsButton data-keep-sidebar-open="true" />
+            <ShowTerminalButton />
+          </Disclosure>
+          <About />
+        </div>
+        <div className="full-width highlighted">
+          <div className="flex-stack">
+            <LanguageSwitcher />
+          </div>
+        </div>
       </Sidebar>
 
       <Layout>
         {/* this is the name of the tool, do not translate it */}
         {/* eslint-disable-next-line i18next/no-literal-string */}
         <Title>Agama</Title>
-        <Content />
+        {language && <Content />}
       </Layout>
     </>
   );

@@ -153,6 +153,7 @@ const contexts = {
     cockpitProxies.proposal = {
       BootDevice: "/dev/sda",
       LVM: true,
+      SystemVGDevices: ["/dev/sda", "/dev/sdb"],
       EncryptionPassword: "00000",
       Volumes: [
         {
@@ -162,6 +163,7 @@ const contexts = {
           MaxSize: { t: "x", v: 2048 },
           AutoSize: { t: "b", v: true },
           Snapshots: { t: "b", v: true },
+          Transactional: { t: "b", v: true },
           Outline: {
             t: "a{sv}",
             v: {
@@ -181,6 +183,7 @@ const contexts = {
           MaxSize: { t: "x", v: 4096 },
           AutoSize: { t: "b", v: false },
           Snapshots: { t: "b", v: false },
+          Transactional: { t: "b", v: false },
           Outline: {
             t: "a{sv}",
             v: {
@@ -694,7 +697,7 @@ describe("#proposal", () => {
       client = new StorageClient();
     });
 
-    it.only("returns the list of product mount points", async () => {
+    it("returns the list of product mount points", async () => {
       const mount_points = await client.proposal.getProductMountPoints();
       expect(mount_points).toEqual(["/", "swap", "/home"]);
     });
@@ -711,6 +714,7 @@ describe("#proposal", () => {
             MaxSize: { t: "x", v: 4096 },
             AutoSize: { t: "b", v: false },
             Snapshots: { t: "b", v: false },
+            Transactional: { t: "b", v: false },
             Outline: {
               t: "a{sv}",
               v: {
@@ -730,6 +734,7 @@ describe("#proposal", () => {
             MaxSize: { t: "x", v: 2048 },
             AutoSize: { t: "b", v: false },
             Snapshots: { t: "b", v: false },
+            Transactional: { t: "b", v: false },
             Outline: {
               t: "a{sv}",
               v: {
@@ -758,6 +763,7 @@ describe("#proposal", () => {
         maxSize: 4096,
         autoSize: false,
         snapshots: false,
+        transactional: false,
         outline: {
           required: false,
           fsTypes: ["Ext4", "XFS"],
@@ -777,6 +783,7 @@ describe("#proposal", () => {
         maxSize: 2048,
         autoSize: false,
         snapshots: false,
+        transactional: false,
         outline: {
           required: false,
           fsTypes: ["Ext4", "XFS"],
@@ -814,6 +821,7 @@ describe("#proposal", () => {
         expect(settings).toStrictEqual({
           bootDevice: "/dev/sda",
           lvm: true,
+          systemVGDevices: ["/dev/sda", "/dev/sdb"],
           encryptionPassword: "00000",
           volumes: [
             {
@@ -823,6 +831,7 @@ describe("#proposal", () => {
               maxSize: 2048,
               autoSize: true,
               snapshots: true,
+              transactional: true,
               outline: {
                 required: true,
                 fsTypes: ["Btrfs", "Ext3"],
@@ -839,6 +848,7 @@ describe("#proposal", () => {
               maxSize: 4096,
               autoSize: false,
               snapshots: false,
+              transactional: false,
               outline: {
                 required: false,
                 fsTypes: ["Ext4", "XFS"],
@@ -877,6 +887,7 @@ describe("#proposal", () => {
         bootDevice: "/dev/vdb",
         encryptionPassword: "12345",
         lvm: true,
+        systemVGDevices: ["/dev/sdc"],
         volumes: [
           {
             mountPath: "/test1",
@@ -897,6 +908,7 @@ describe("#proposal", () => {
         BootDevice: { t: "s", v: "/dev/vdb" },
         EncryptionPassword: { t: "s", v: "12345" },
         LVM: { t: "b", v: true },
+        SystemVGDevices: { t: "as", v: ["/dev/sdc"] },
         Volumes: {
           t: "aa{sv}",
           v: [
