@@ -1,4 +1,4 @@
-use agama_dbus_server::network::model::{self, IpConfig, IpMethod, Parent};
+use agama_dbus_server::network::model::{self, IpConfig, Ipv4Method, Ipv6Method, Parent};
 use cidr::IpInet;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::{
@@ -474,7 +474,7 @@ impl From<Interface> for model::Connection {
 
 impl From<&Interface> for IpConfig {
     fn from(val: &Interface) -> Self {
-        let method4 = IpMethod::from_str(if val.ipv4.enabled && val.ipv4_static.is_some() {
+        let method4 = Ipv4Method::from_str(if val.ipv4.enabled && val.ipv4_static.is_some() {
             "manual"
         } else if !val.ipv4.enabled {
             "disabled"
@@ -482,7 +482,7 @@ impl From<&Interface> for IpConfig {
             "auto"
         })
         .unwrap();
-        let method6 = IpMethod::from_str(if val.ipv6.enabled && val.ipv6_static.is_some() {
+        let method6 = Ipv6Method::from_str(if val.ipv6.enabled && val.ipv6_static.is_some() {
             "manual"
         // currently not implemented by agama
         // FIXME uncomment when implemented
@@ -593,12 +593,18 @@ mod tests {
         };
 
         let static_connection: model::Connection = static_interface.into();
-        assert_eq!(static_connection.base().ip_config.method4, IpMethod::Manual);
+        assert_eq!(
+            static_connection.base().ip_config.method4,
+            Ipv4Method::Manual
+        );
         assert_eq!(
             static_connection.base().ip_config.addresses[0].to_string(),
             "127.0.0.1/8"
         );
-        assert_eq!(static_connection.base().ip_config.method6, IpMethod::Manual);
+        assert_eq!(
+            static_connection.base().ip_config.method6,
+            Ipv6Method::Manual
+        );
         assert_eq!(
             static_connection.base().ip_config.addresses[1].to_string(),
             "::1"
@@ -646,8 +652,8 @@ mod tests {
         };
 
         let static_connection: model::Connection = static_interface.into();
-        assert_eq!(static_connection.base().ip_config.method4, IpMethod::Auto);
-        assert_eq!(static_connection.base().ip_config.method6, IpMethod::Auto);
+        assert_eq!(static_connection.base().ip_config.method4, Ipv4Method::Auto);
+        assert_eq!(static_connection.base().ip_config.method6, Ipv6Method::Auto);
         assert_eq!(static_connection.base().ip_config.addresses.len(), 0);
     }
 
