@@ -6,7 +6,7 @@
   <interface name="org.opensuse.Agama.Storage1.Proposal">
     <property type="s" name="BootDevice" access="read"/>
     <property type="b" name="LVM" access="read"/>
-    <property type="aas" name="SystemVGDevices" access="read"/>
+    <property type="as" name="SystemVGDevices" access="read"/>
     <property type="s" name="EncryptionPassword" access="read"/>
     <property type="s" name="EncryptionMethod" access="read"/>
     <property type="s" name="EncryptionPBKDFunction" access="read"/>
@@ -22,7 +22,8 @@
         MinSize                 t (bytes)
         MaxSize                 t (bytes. Optional, max size is considered as unlimited if omitted)
         AutoSize                b
-        Snapshots               b
+        Snapshots               b ( makes sense only for btrfs )
+        Transactional           b ( makes sense only for btrfs )
         Outline                 a{sv}
           Required              b
           FsTypes               as

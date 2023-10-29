@@ -25,13 +25,10 @@ import "core-js/stable";
 import "regenerator-runtime/runtime";
 
 import { HashRouter, Routes, Route } from "react-router-dom";
-import { InstallerClientProvider } from "~/context/installer";
-import { SoftwareProvider } from "~/context/software";
-import { NotificationProvider } from "~/context/notification";
-import { createClient } from "~/client";
+import { AgamaProviders } from "~/context/agama";
 
 /**
- * Import PF4 base styles before any JSX since components coming from PF4 may
+ * Import PF base styles before any JSX since components coming from PF may
  * import styles dependent on variables and rules previously defined there.
  */
 import "@patternfly/patternfly/patternfly-base.scss";
@@ -39,10 +36,8 @@ import "@patternfly/patternfly/patternfly-base.scss";
 import App from "~/App";
 import Main from "~/Main";
 import DevServerWrapper from "~/DevServerWrapper";
-import L10nWrapper from "~/L10nWrapper";
-import L10nBackendWrapper from "~/L10nBackendWrapper";
 import { Overview } from "~/components/overview";
-import { ProductSelectionPage } from "~/components/software";
+import { ProductSelectionPage, SoftwarePage } from "~/components/software";
 import { ProposalPage as StoragePage, ISCSIPage, DASDPage, ZFCPPage } from "~/components/storage";
 import { UsersPage } from "~/components/users";
 import { L10nPage } from "~/components/l10n";
@@ -51,7 +46,7 @@ import { IssuesPage } from "~/components/core";
 
 /**
  * As JSX components might import CSS stylesheets, our styles must be imported
- * after them to preserve our overrides (e.g., PF4 overrides).
+ * after them to preserve our overrides (e.g., PF overrides).
  *
  * Because mini-css-extract-plugin maintains the order of the imported CSS,
  * adding the overrides here ensures the overrides will be placed appropriately
@@ -73,35 +68,28 @@ const container = document.getElementById("root");
 const root = createRoot(container);
 
 root.render(
-  <L10nWrapper>
-    <LoginWrapper>
-      <InstallerClientProvider client={createClient}>
-        <L10nBackendWrapper>
-          <SoftwareProvider>
-            <NotificationProvider>
-              <HashRouter>
-                <Routes>
-                  <Route path="/" element={<App />}>
-                    <Route path="/" element={<Main />}>
-                      <Route index element={<Overview />} />
-                      <Route path="/overview" element={<Overview />} />
-                      <Route path="/l10n" element={<L10nPage />} />
-                      <Route path="/storage" element={<StoragePage />} />
-                      <Route path="/storage/iscsi" element={<ISCSIPage />} />
-                      <Route path="/storage/dasd" element={<DASDPage />} />
-                      <Route path="/storage/zfcp" element={<ZFCPPage />} />
-                      <Route path="/network" element={<NetworkPage />} />
-                      <Route path="/users" element={<UsersPage />} />
-                      <Route path="/issues" element={<IssuesPage />} />
-                    </Route>
-                    <Route path="products" element={<ProductSelectionPage />} />
-                  </Route>
-                </Routes>
-              </HashRouter>
-            </NotificationProvider>
-          </SoftwareProvider>
-        </L10nBackendWrapper>
-      </InstallerClientProvider>
-    </LoginWrapper>
-  </L10nWrapper>
+  <LoginWrapper>
+    <AgamaProviders>
+      <HashRouter>
+        <Routes>
+          <Route path="/" element={<App />}>
+            <Route path="/" element={<Main />}>
+              <Route index element={<Overview />} />
+              <Route path="/overview" element={<Overview />} />
+              <Route path="/l10n" element={<L10nPage />} />
+              <Route path="/software" element={<SoftwarePage />} />
+              <Route path="/storage" element={<StoragePage />} />
+              <Route path="/storage/iscsi" element={<ISCSIPage />} />
+              <Route path="/storage/dasd" element={<DASDPage />} />
+              <Route path="/storage/zfcp" element={<ZFCPPage />} />
+              <Route path="/network" element={<NetworkPage />} />
+              <Route path="/users" element={<UsersPage />} />
+              <Route path="/issues" element={<IssuesPage />} />
+            </Route>
+            <Route path="products" element={<ProductSelectionPage />} />
+          </Route>
+        </Routes>
+      </HashRouter>
+    </AgamaProviders>
+  </LoginWrapper>
 );

@@ -64,6 +64,11 @@
   height: 32px;
 }
 
+.icon-big {
+  inline-size: 10rem;
+  block-size: 10rem;
+}
+
 .color-warn {
   color: var(--color-warn);
 }
@@ -150,4 +155,8 @@
   block-size: 95dvh;
   inline-size: 95dvw;
   max-inline-size: calc(var(--ui-max-inline-size) + var(--spacer-large))
+}
+
+.cursor-pointer {
+  cursor: pointer;
 }

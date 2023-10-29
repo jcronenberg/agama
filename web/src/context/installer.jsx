@@ -1,5 +1,5 @@
 /*
- * Copyright (c) [2021] SUSE LLC
+ * Copyright (c) [2021-2023] SUSE LLC
  *
  * All Rights Reserved.
  *
@@ -22,10 +22,12 @@
 // @ts-check
 
 import React, { useState, useEffect } from "react";
-import cockpit from "../lib/cockpit";
-import { createClient } from "~/client";
+import { createDefaultClient } from "~/client";
 
-const InstallerClientContext = React.createContext(undefined);
+const InstallerClientContext = React.createContext(null);
+// TODO: we use a separate context to avoid changing all the codes to
+// `useInstallerClient`. We should merge them in the future.
+const InstallerClientStatusContext = React.createContext({ connected: false, attempt: 0 });
 
 /**
  * Returns the D-Bus installer client
@@ -34,41 +36,81 @@ const InstallerClientContext = React.createContext(undefined);
  */
 function useInstallerClient() {
   const context = React.useContext(InstallerClientContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useInstallerClient must be used within a InstallerClientProvider");
   }
 
   return context;
 }
 
-const BUS_ADDRESS_FILE = "/run/agama/bus.address";
+/**
+ * Returns the client status.
+ *
+ * @typedef {object} ClientStatus
+ * @property {boolean} connected - whether the client is connected
+ * @property {number} attempt - number of attempt to connect
+ *
+ * @return {ClientStatus} installer client status
+ */
+function useInstallerClientStatus() {
+  const context = React.useContext(InstallerClientStatusContext);
+  if (!context) {
+    throw new Error("useInstallerClientStatus must be used within a InstallerClientProvider");
+  }
+
+  return context;
+}
+
+const INTERVAL = 2000;
 
 /**
   * @param {object} props
   * @param {import("~/client").InstallerClient|undefined} [props.client] client to connect to
   *   Agama service; if it is undefined, it instantiates a new one using the address
   *   registered in /run/agama/bus.address.
+  * @param {number} [props.interval=2000] - Interval in milliseconds between connection attempt
+  *   (2000 by default).
   * @param {React.ReactNode} [props.children] - content to display within the provider
   */
-function InstallerClientProvider({ client, children }) {
+function InstallerClientProvider({
+  children, client = null, interval = INTERVAL
+}) {
   const [value, setValue] = useState(client);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (client !== undefined) {
-      const file = cockpit.file(BUS_ADDRESS_FILE);
-      file.read().then(address => {
-        setValue(createClient(address));
-      });
-    }
-  }, [client]);
+    const connectClient = async () => {
+      const client = await createDefaultClient();
+      if (await client.isConnected()) {
+        setValue(client);
+        setAttempt(0);
+      }
 
-  if (!value) {
-    return null;
-  }
+      console.warn(`Failed to connect to D-Bus (attempt ${attempt + 1})`);
+      await new Promise(resolve => setTimeout(resolve, interval));
+      setAttempt(attempt + 1);
+    };
+
+    if (!value) connectClient();
+  }, [setValue, value, setAttempt, attempt, interval]);
+
+  useEffect(() => {
+    if (!value) return;
+
+    return value.onDisconnect(() => setValue(null));
+  }, [value]);
 
   return (
-    <InstallerClientContext.Provider value={value}>{children}</InstallerClientContext.Provider>
+    <InstallerClientContext.Provider value={value}>
+      <InstallerClientStatusContext.Provider value={{ attempt, connected: !!value }}>
+        {children}
+      </InstallerClientStatusContext.Provider>
+    </InstallerClientContext.Provider>
   );
 }
 
-export { InstallerClientProvider, useInstallerClient };
+export {
+  InstallerClientProvider,
+  useInstallerClient,
+  useInstallerClientStatus
+};

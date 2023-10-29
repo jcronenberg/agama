@@ -226,8 +226,9 @@ class ProposalManager {
   /**
    * @typedef {object} ProposalSettings
    * @property {string} bootDevice
-   * @property {boolean} lvm
    * @property {string} encryptionPassword
+   * @property {boolean} lvm
+   * @property {string[]} systemVGDevices
    * @property {Volume[]} volumes
    *
    * @typedef {object} Volume
@@ -237,6 +238,7 @@ class ProposalManager {
    * @property {number} [maxSize]
    * @property {boolean} autoSize
    * @property {boolean} snapshots
+   * @property {boolean} transactional
    * @property {VolumeOutline} outline
    *
    * @typedef {object} VolumeOutline
@@ -322,6 +324,7 @@ class ProposalManager {
         settings: {
           bootDevice: proxy.BootDevice,
           lvm: proxy.LVM,
+          systemVGDevices: proxy.SystemVGDevices,
           encryptionPassword: proxy.EncryptionPassword,
           volumes: proxy.Volumes.map(this.buildVolume),
         },
@@ -338,7 +341,7 @@ class ProposalManager {
    * @param {ProposalSettings} settings
    * @returns {Promise<number>} 0 on success, 1 on failure
    */
-  async calculate({ bootDevice, encryptionPassword, lvm, volumes }) {
+  async calculate({ bootDevice, encryptionPassword, lvm, systemVGDevices, volumes }) {
     const dbusVolume = (volume) => {
       return removeUndefinedCockpitProperties({
         MountPath: { t: "s", v: volume.mountPath },
@@ -346,7 +349,8 @@ class ProposalManager {
         MinSize: { t: "t", v: volume.minSize },
         MaxSize: { t: "t", v: volume.maxSize },
         AutoSize: { t: "b", v: volume.autoSize },
-        Snapshots: { t: "b", v: volume.snapshots }
+        Snapshots: { t: "b", v: volume.snapshots },
+        Transactional: { t: "b", v: volume.transactional },
       });
     };
 
@@ -354,6 +358,7 @@ class ProposalManager {
       BootDevice: { t: "s", v: bootDevice },
       EncryptionPassword: { t: "s", v: encryptionPassword },
       LVM: { t: "b", v: lvm },
+      SystemVGDevices: { t: "as", v: systemVGDevices },
       Volumes: { t: "aa{sv}", v: volumes?.map(dbusVolume) }
     });
 
@@ -374,6 +379,7 @@ class ProposalManager {
    * @property {CockpitNumber} [MaxSize]
    * @property {CockpitBoolean} AutoSize
    * @property {CockpitBoolean} Snapshots
+   * @property {CockpitBoolean} Transactional
    * @property {CockpitVolumeOutline} Outline
    *
    * @typedef {Object} DBusVolumeOutline
@@ -427,6 +433,7 @@ class ProposalManager {
       maxSize: dbusVolume.MaxSize?.v,
       autoSize: dbusVolume.AutoSize.v,
       snapshots: dbusVolume.Snapshots.v,
+      transactional: dbusVolume.Transactional.v,
       outline: buildOutline(dbusVolume.Outline.v)
     };
   }
