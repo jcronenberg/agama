@@ -1,5 +1,5 @@
 [package]
-name = "agama-migrate-wicked"
+name = "migrate-wicked"
 version = "0.1.0"
 edition = "2021"
 
@@ -21,7 +21,7 @@ simplelog = "0.12.1"
 strum = "0.25.0"
 strum_macros = "0.25.2"
 serde_with = "3.3.0"
-tokio = "1.33.0"
+tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread"] }
 
 [[bin]]
 name = "migrate-wicked"
