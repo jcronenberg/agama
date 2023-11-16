@@ -1,6 +1,7 @@
 use crate::reader::read as wicked_read;
 use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use std::error::Error;
+use tokio::{runtime::Handle, task};
 
 struct WickedAdapter {
     paths: Vec<String>,
@@ -14,15 +15,17 @@ impl WickedAdapter {
 
 impl Adapter for WickedAdapter {
     fn read(&self) -> Result<model::NetworkState, Box<dyn std::error::Error>> {
-        async_std::task::block_on(async {
-            let interfaces = wicked_read(self.paths.clone())?;
-            let mut state = NetworkState::new(vec![], vec![]);
+        task::block_in_place(|| {
+            Handle::current().block_on(async {
+                let interfaces = wicked_read(self.paths.clone())?;
+                let mut state = NetworkState::new(vec![], vec![]);
 
-            for interface in interfaces {
-                let conn: model::Connection = interface.into();
-                state.add_connection(conn)?;
-            }
-            Ok(state)
+                for interface in interfaces {
+                    let conn: model::Connection = interface.into();
+                    state.add_connection(conn)?;
+                }
+                Ok(state)
+            })
         })
     }
 
