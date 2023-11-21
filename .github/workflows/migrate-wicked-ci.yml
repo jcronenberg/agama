@@ -11,7 +11,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ./rust/agama-migrate-wicked
+        working-directory: ./rust/migrate-wicked
 
     strategy:
       fail-fast: false
@@ -32,16 +32,16 @@ jobs:
       run: cargo-binstall --no-confirm cargo-tarpaulin
 
     - name: Unit tests
-      run: cargo tarpaulin --color always -p agama-migrate-wicked --exclude-files "agama-locale-data/*" --exclude-files "agama-lib/*" --exclude-files "agama-settings/*" --exclude-files "agama-dbus-server/*" --exclude-files "agama-cli/*" --out xml
+      run: cargo tarpaulin --color always --out xml
 
     - name: Lint tests
       run: cargo fmt --all -- --check
 
     - name: Cargo clippy
-      run: cargo clippy -p agama-migrate-wicked -- --no-deps -D warnings
+      run: cargo clippy -- --no-deps -D warnings
 
     - name: Cargo clippy on unit tests
-      run: cargo clippy -p agama-migrate-wicked -- --no-deps --cfg test -A unused_imports -D warnings
+      run: cargo clippy -- --no-deps --cfg test -A unused_imports -D warnings
 
     - name: Coveralls GitHub Action
       uses: coverallsapp/github-action@v2

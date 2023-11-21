@@ -20,7 +20,7 @@ jobs:
       run: podman run --privileged --detach --name migrate-wicked --ipc=host -e CARGO_TERM_COLOR=always -v /dev:/dev -v .:/checkout registry.opensuse.org/home/jcronenberg/github-ci/containers/opensuse/migrate-wicked-testing:latest
 
     - name: Build migrate-wicked
-      run: podman exec migrate-wicked bash -c "cd /checkout/rust/agama-migrate-wicked/ && cargo build"
+      run: podman exec migrate-wicked bash -c "cd /checkout/rust/migrate-wicked/ && cargo build"
 
     - name: Run migration integration tests
-      run: podman exec migrate-wicked bash -c "/checkout/rust/agama-migrate-wicked/tests/test.sh"
+      run: podman exec migrate-wicked bash -c "/checkout/rust/migrate-wicked/tests/test.sh"

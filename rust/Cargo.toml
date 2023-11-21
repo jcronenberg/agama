@@ -5,7 +5,8 @@ members = [
   "agama-derive",
   "agama-lib",
   "agama-locale-data",
-  "agama-migrate-wicked",
   "agama-settings"
 ]
-
+exclude = [
+  "migrate-wicked"
+]

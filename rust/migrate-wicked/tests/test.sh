@@ -4,7 +4,7 @@ GREEN='\033[0;32m'
 BOLD='\033[1m'
 NC='\033[0m'
 RESULT=0
-MIGRATE_WICKED_BIN=../../target/debug/migrate-wicked
+MIGRATE_WICKED_BIN=../target/debug/migrate-wicked
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR
 TEST_DIRS=$(ls -d */ | sed 's#/##')
