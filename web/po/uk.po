@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-22 02:10+0000\n"
+"POT-Creation-Date: 2023-11-05 02:14+0000\n"
 "PO-Revision-Date: 2023-08-06 21:15+0000\n"
 "Last-Translator: Milachew <milachew@mail.lv>\n"
 "Language-Team: Ukrainian <https://l10n.opensuse.org/projects/agama/agama-web/"
@@ -20,7 +20,7 @@ msgstr ""
 "%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;\n"
 "X-Generator: Weblate 4.9.1\n"
 
-#: src/App.jsx:103
+#: src/App.jsx:112
 msgid "Diagnostic tools"
 msgstr ""
 
@@ -68,20 +68,20 @@ msgid "Close"
 msgstr "Закрити"
 
 #. TRANSLATORS: button label
-#: src/components/core/DBusError.jsx:40
+#: src/components/core/DBusError.jsx:41
 msgid "Reload"
 msgstr ""
 
 #. TRANSLATORS: page title
-#: src/components/core/DBusError.jsx:48
+#: src/components/core/DBusError.jsx:49
 msgid "D-Bus Error"
 msgstr ""
 
-#: src/components/core/DBusError.jsx:54
+#: src/components/core/DBusError.jsx:55
 msgid "Cannot connect to D-Bus"
 msgstr ""
 
-#: src/components/core/DBusError.jsx:59
+#: src/components/core/DBusError.jsx:60
 msgid ""
 "Could not connect to the D-Bus service. Please, check whether it is running."
 msgstr ""
@@ -334,11 +334,6 @@ msgstr ""
 msgid "Display Language"
 msgstr ""
 
-#: src/components/layout/Icon.jsx:157
-#, c-format
-msgid "Icon %s not found!"
-msgstr ""
-
 #: src/components/layout/Loading.jsx:30
 msgid "Loading installation environment, please wait."
 msgstr ""
@@ -379,8 +374,8 @@ msgstr ""
 msgid "Addresses data list"
 msgstr ""
 
-#. TRANSLATORS: table header
 #. TRANSLATORS: input field for the iSCSI initiator name
+#. TRANSLATORS: table header
 #: src/components/network/ConnectionsTable.jsx:57
 #: src/components/network/ConnectionsTable.jsx:86
 #: src/components/storage/ZFCPPage.jsx:362
@@ -511,8 +506,8 @@ msgstr ""
 msgid "Connect to a Wi-Fi network"
 msgstr ""
 
-#. TRANSLATORS: page title
 #. TRANSLATORS: page section title
+#. TRANSLATORS: page title
 #: src/components/network/NetworkPage.jsx:170
 #: src/components/overview/NetworkSection.jsx:102
 msgid "Network"
@@ -594,8 +589,8 @@ msgstr ""
 msgid "Disconnecting"
 msgstr ""
 
-#. TRANSLATORS: Wifi network status
 #. TRANSLATORS: iSCSI connection status
+#. TRANSLATORS: Wifi network status
 #: src/components/network/WifiNetworkListItem.jsx:50
 #: src/components/storage/iscsi/NodesPresenter.jsx:63
 msgid "Disconnected"
@@ -642,8 +637,8 @@ msgstr ""
 msgid "Refresh the repositories"
 msgstr ""
 
-#. TRANSLATORS: page title
 #. TRANSLATORS: page section
+#. TRANSLATORS: page title
 #: src/components/overview/SoftwareSection.jsx:145
 #: src/components/software/SoftwarePage.jsx:81
 msgid "Software"
@@ -665,8 +660,8 @@ msgstr ""
 msgid "Probing storage devices"
 msgstr ""
 
-#. TRANSLATORS: page section title
 #. TRANSLATORS: page title
+#. TRANSLATORS: page section title
 #: src/components/overview/StorageSection.jsx:182
 #: src/components/storage/ProposalPage.jsx:218
 msgid "Storage"
@@ -750,8 +745,13 @@ msgstr ""
 msgid "%d errors"
 msgstr ""
 
+#: src/components/software/PatternSelector.jsx:210
+msgid "Software summary and filter options"
+msgstr ""
+
 #. TRANSLATORS: search field placeholder text
-#: src/components/software/PatternSelector.jsx:214
+#: src/components/software/PatternSelector.jsx:215
+#: src/components/software/PatternSelector.jsx:216
 msgid "Search"
 msgstr ""
 
@@ -1094,7 +1094,7 @@ msgid "Edit file system"
 msgstr ""
 
 #: src/components/storage/ProposalVolumes.jsx:306
-#: src/components/storage/VolumeForm.jsx:498
+#: src/components/storage/VolumeForm.jsx:500
 msgid "Mount point"
 msgstr ""
 
@@ -1103,7 +1103,7 @@ msgid "Details"
 msgstr ""
 
 #: src/components/storage/ProposalVolumes.jsx:308
-#: src/components/storage/VolumeForm.jsx:515
+#: src/components/storage/VolumeForm.jsx:517
 msgid "Size"
 msgstr ""
 
@@ -1116,53 +1116,53 @@ msgid "File systems to create in your system"
 msgstr ""
 
 #. TRANSLATORS: item which affects the final computed partition size
-#: src/components/storage/VolumeForm.jsx:96
+#: src/components/storage/VolumeForm.jsx:97
 msgid "the configuration of snapshots"
 msgstr ""
 
 #. TRANSLATORS: item which affects the final computed partition size
 #. %s is replaced by a list of mount points like "/home, /boot"
-#: src/components/storage/VolumeForm.jsx:101
+#: src/components/storage/VolumeForm.jsx:102
 #, c-format
 msgid "the presence of the file system for %s"
 msgstr ""
 
 #. TRANSLATORS: conjunction for merging two list items
-#: src/components/storage/VolumeForm.jsx:103
+#: src/components/storage/VolumeForm.jsx:104
 msgid ", "
 msgstr ""
 
 #. TRANSLATORS: the %s is replaced by the items which affect the computed size
-#: src/components/storage/VolumeForm.jsx:106
+#: src/components/storage/VolumeForm.jsx:107
 #, c-format
 msgid "The final size depends on %s."
 msgstr ""
 
 #. TRANSLATORS: conjunction for merging two texts
-#: src/components/storage/VolumeForm.jsx:108
+#: src/components/storage/VolumeForm.jsx:109
 msgid " and "
 msgstr ""
 
 #. TRANSLATORS: the partition size is automatically computed
-#: src/components/storage/VolumeForm.jsx:113
+#: src/components/storage/VolumeForm.jsx:114
 msgid "Automatically calculated size according to the selected product."
 msgstr ""
 
-#: src/components/storage/VolumeForm.jsx:133
+#: src/components/storage/VolumeForm.jsx:134
 msgid "Exact size for the file system."
 msgstr ""
 
 #. TRANSLATORS: requested partition size
-#: src/components/storage/VolumeForm.jsx:145
+#: src/components/storage/VolumeForm.jsx:146
 msgid "Exact size"
 msgstr ""
 
 #. TRANSLATORS: units selector (like KiB, MiB, GiB...)
-#: src/components/storage/VolumeForm.jsx:160
+#: src/components/storage/VolumeForm.jsx:161
 msgid "Size unit"
 msgstr ""
 
-#: src/components/storage/VolumeForm.jsx:188
+#: src/components/storage/VolumeForm.jsx:189
 msgid ""
 "Limits for the file system size. The final size will be a value between the "
 "given minimum and maximum. If no maximum is given then the file system will "
@@ -1170,61 +1170,61 @@ msgid ""
 msgstr ""
 
 #. TRANSLATORS: the minimal partition size
-#: src/components/storage/VolumeForm.jsx:195
+#: src/components/storage/VolumeForm.jsx:196
 msgid "Minimum"
 msgstr ""
 
 #. TRANSLATORS: the minium partition size
-#: src/components/storage/VolumeForm.jsx:205
+#: src/components/storage/VolumeForm.jsx:206
 msgid "Minimum desired size"
 msgstr ""
 
-#: src/components/storage/VolumeForm.jsx:214
+#: src/components/storage/VolumeForm.jsx:215
 msgid "Unit for the minimum size"
 msgstr ""
 
 #. TRANSLATORS: the maximum partition size
-#: src/components/storage/VolumeForm.jsx:225
+#: src/components/storage/VolumeForm.jsx:226
 msgid "Maximum"
 msgstr ""
 
 #. TRANSLATORS: the maximum partition size
-#: src/components/storage/VolumeForm.jsx:236
+#: src/components/storage/VolumeForm.jsx:237
 msgid "Maximum desired size"
 msgstr ""
 
-#: src/components/storage/VolumeForm.jsx:244
+#: src/components/storage/VolumeForm.jsx:245
 msgid "Unit for the maximum size"
 msgstr ""
 
 #. TRANSLATORS: radio button label, fully automatically computed partition size, no user input
-#: src/components/storage/VolumeForm.jsx:261
+#: src/components/storage/VolumeForm.jsx:262
 msgid "Auto"
 msgstr ""
 
 #. TRANSLATORS: radio button label, exact partition size requested by user
-#: src/components/storage/VolumeForm.jsx:263
+#: src/components/storage/VolumeForm.jsx:264
 msgid "Fixed"
 msgstr ""
 
 #. TRANSLATORS: radio button label, automatically computed partition size within the user provided min and max limits
-#: src/components/storage/VolumeForm.jsx:265
+#: src/components/storage/VolumeForm.jsx:266
 msgid "Range"
 msgstr ""
 
-#: src/components/storage/VolumeForm.jsx:468
+#: src/components/storage/VolumeForm.jsx:470
 msgid "A size value is required"
 msgstr ""
 
-#: src/components/storage/VolumeForm.jsx:473
+#: src/components/storage/VolumeForm.jsx:475
 msgid "Minimum size is required"
 msgstr ""
 
-#: src/components/storage/VolumeForm.jsx:477
+#: src/components/storage/VolumeForm.jsx:479
 msgid "Maximum must be greater than minimum"
 msgstr ""
 
-#: src/components/storage/VolumeForm.jsx:507
+#: src/components/storage/VolumeForm.jsx:509
 msgid "File system type"
 msgstr ""
 

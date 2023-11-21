@@ -24,40 +24,24 @@
 import React from "react";
 import { InstallerClientProvider } from "./installer";
 import { L10nProvider } from "./l10n";
-import { SoftwareProvider } from "./software";
+import { ProductProvider } from "./product";
 import { NotificationProvider } from "./notification";
-
-const InternalProviders = ({ children }) => {
-  return (
-    <SoftwareProvider>
-      <NotificationProvider>
-        {children}
-      </NotificationProvider>
-    </SoftwareProvider>
-  );
-};
 
 /**
  * Combines all application providers.
  *
  * @param {object} props
  * @param {React.ReactNode} [props.children] - content to display within the provider.
- * @param {boolean} [props.disableL10n] - Disable l10n handling (to be used
- *   during tests). FIXME: this argument might not be needed anymore.
  */
-function AgamaProviders({ disableL10n, children }) {
-  if (disableL10n) {
-    return (
-      <InstallerClientProvider>
-        <InternalProviders>{children}</InternalProviders>
-      </InstallerClientProvider>
-    );
-  }
-
+function AgamaProviders({ children }) {
   return (
     <InstallerClientProvider>
       <L10nProvider>
-        <InternalProviders>{children}</InternalProviders>
+        <ProductProvider>
+          <NotificationProvider>
+            {children}
+          </NotificationProvider>
+        </ProductProvider>
       </L10nProvider>
     </InstallerClientProvider>
   );

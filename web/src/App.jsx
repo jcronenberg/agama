@@ -24,6 +24,7 @@ import { Outlet } from "react-router-dom";
 
 import { _ } from "~/i18n";
 import { useInstallerClient, useInstallerClientStatus } from "~/context/installer";
+import { useProduct } from "./context/product";
 import { STARTUP, INSTALL } from "~/client/phase";
 import { BUSY } from "~/client/status";
 
@@ -33,13 +34,11 @@ import {
   Disclosure,
   Installation,
   IssuesLink,
-  LoadingEnvironment,
   LogsButton,
   ShowLogButton,
   ShowTerminalButton,
   Sidebar
 } from "~/components/core";
-import { ChangeProductLink } from "~/components/software";
 import { LanguageSwitcher } from "./components/l10n";
 import { Layout, Loading, Title } from "./components/layout";
 import { useL10n } from "./context/l10n";
@@ -57,9 +56,22 @@ const ATTEMPTS = 3;
 function App() {
   const client = useInstallerClient();
   const { attempt } = useInstallerClientStatus();
+  const { products } = useProduct();
   const { language } = useL10n();
   const [status, setStatus] = useState(undefined);
   const [phase, setPhase] = useState(undefined);
+
+  useEffect(() => {
+    if (client) {
+      return client.manager.onPhaseChange(setPhase);
+    }
+  }, [client, setPhase]);
+
+  useEffect(() => {
+    if (client) {
+      return client.manager.onStatusChange(setStatus);
+    }
+  }, [client, setStatus]);
 
   useEffect(() => {
     const loadPhase = async () => {
@@ -69,26 +81,22 @@ function App() {
       setStatus(status);
     };
 
-    if (client) loadPhase().catch(console.error);
+    if (client) {
+      loadPhase().catch(console.error);
+    }
   }, [client, setPhase, setStatus]);
 
-  useEffect(() => {
-    if (client) {
-      return client.manager.onPhaseChange(setPhase);
-    }
-  }, [client, setPhase]);
-
   const Content = () => {
-    if (!client) {
+    if (!client || !products) {
       return (attempt > ATTEMPTS) ? <DBusError /> : <Loading />;
     }
 
     if ((phase === STARTUP && status === BUSY) || phase === undefined || status === undefined) {
-      return <LoadingEnvironment onStatusChange={setStatus} />;
+      return <Loading />;
     }
 
     if (phase === INSTALL) {
-      return <Installation />;
+      return <Installation status={status} />;
     }
 
     return <Outlet />;
@@ -98,7 +106,6 @@ function App() {
     <>
       <Sidebar>
         <div className="flex-stack">
-          <ChangeProductLink />
           <IssuesLink />
           <Disclosure label={_("Diagnostic tools")} data-keep-sidebar-open>
             <ShowLogButton />
