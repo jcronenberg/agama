@@ -8,6 +8,7 @@ use log::*;
 use migrate::migrate;
 use reader::read as wicked_read;
 use std::process::{ExitCode, Termination};
+use tokio::sync::OnceCell;
 
 #[derive(Parser)]
 #[command(name = "migrate-wicked", version, about, long_about = None)]
@@ -40,6 +41,10 @@ pub enum Commands {
     Migrate {
         /// Wicked XML Files or directories where the wicked xml configs are located
         paths: Vec<String>,
+
+        /// Continue migration if warnings are encountered
+        #[arg(short, long, global = true)]
+        continue_migration: bool,
     },
 }
 
@@ -56,20 +61,37 @@ pub enum Format {
 async fn run_command(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Commands::Show { paths, format } => {
-            let interfaces = wicked_read(paths)?;
+            MIGRATION_SETTINGS
+                .set(MigrationSettings {
+                    continue_migration: true,
+                })
+                .expect("MIGRATION_SETTINGS was set too early");
+
+            let interfaces_result = wicked_read(paths)?;
             let output: String = match format {
-                Format::Json => serde_json::to_string(&interfaces)?,
-                Format::PrettyJson => serde_json::to_string_pretty(&interfaces)?,
-                Format::Yaml => serde_yaml::to_string(&interfaces)?,
-                Format::Xml => quick_xml::se::to_string_with_root("interface", &interfaces)?,
-                Format::Text => format!("{:?}", interfaces),
+                Format::Json => serde_json::to_string(&interfaces_result.interfaces)?,
+                Format::PrettyJson => serde_json::to_string_pretty(&interfaces_result.interfaces)?,
+                Format::Yaml => serde_yaml::to_string(&interfaces_result.interfaces)?,
+                Format::Xml => {
+                    quick_xml::se::to_string_with_root("interface", &interfaces_result.interfaces)?
+                }
+                Format::Text => format!("{:?}", interfaces_result.interfaces),
             };
             println!("{}", output);
             Ok(())
         }
-        Commands::Migrate { paths } => {
-            migrate(paths).await.unwrap();
-            Ok(())
+        Commands::Migrate {
+            paths,
+            continue_migration,
+        } => {
+            MIGRATION_SETTINGS
+                .set(MigrationSettings { continue_migration })
+                .expect("MIGRATION_SETTINGS was set too early");
+
+            match migrate(paths).await {
+                Ok(()) => Ok(()),
+                Err(e) => Err(anyhow::anyhow!("Migration failed: {:?}", e)),
+            }
         }
     }
 }
@@ -88,6 +110,13 @@ impl Termination for CliResult {
     }
 }
 
+#[derive(Debug)]
+struct MigrationSettings {
+    continue_migration: bool,
+}
+
+static MIGRATION_SETTINGS: OnceCell<MigrationSettings> = OnceCell::const_new();
+
 #[tokio::main]
 async fn main() -> CliResult {
     let cli = Cli::parse();
@@ -104,5 +133,6 @@ async fn main() -> CliResult {
         eprintln!("{:?}", error);
         return CliResult::Error;
     }
+
     CliResult::Ok
 }

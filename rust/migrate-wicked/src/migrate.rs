@@ -1,7 +1,6 @@
-use crate::reader::read as wicked_read;
+use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
 use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use std::error::Error;
-use tokio::{runtime::Handle, task};
 
 struct WickedAdapter {
     paths: Vec<String>,
@@ -15,18 +14,32 @@ impl WickedAdapter {
 
 impl Adapter for WickedAdapter {
     fn read(&self) -> Result<model::NetworkState, Box<dyn std::error::Error>> {
-        task::block_in_place(|| {
-            Handle::current().block_on(async {
-                let interfaces = wicked_read(self.paths.clone())?;
-                let mut state = NetworkState::new(vec![], vec![]);
+        let interfaces = wicked_read(self.paths.clone())?;
+        let settings = MIGRATION_SETTINGS.get().unwrap();
 
-                for interface in interfaces {
-                    let conn: model::Connection = interface.into();
-                    state.add_connection(conn)?;
+        if !settings.continue_migration && interfaces.warning.is_some() {
+            return Err(interfaces.warning.unwrap().into());
+        }
+
+        let mut state = NetworkState::new(vec![], vec![]);
+
+        for interface in interfaces.interfaces {
+            let connection_result = interface.to_connection()?;
+            if !connection_result.warnings.is_empty() {
+                for connection_error in &connection_result.warnings {
+                    log::warn!("{}", connection_error);
                 }
-                Ok(state)
-            })
-        })
+                if !settings.continue_migration {
+                    return Err(anyhow::anyhow!(
+                        "Migration of {} failed",
+                        connection_result.connection.id()
+                    )
+                    .into());
+                }
+            }
+            state.add_connection(connection_result.connection)?;
+        }
+        Ok(state)
     }
 
     fn write(&self, _network: &model::NetworkState) -> Result<(), Box<dyn std::error::Error>> {
