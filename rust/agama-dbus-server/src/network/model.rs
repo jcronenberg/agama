@@ -206,27 +206,6 @@ mod tests {
         let conn = Connection::Loopback(LoopbackConnection { base });
         assert!(conn.is_loopback());
     }
-
-    #[test]
-    fn test_mac_addr() {
-        assert_eq!(
-            MacAddr::try_from("11:22:33:44:55:66"),
-            Ok(MacAddr {
-                data: [0x11, 0x22, 0x33, 0x44, 0x55, 0x66]
-            })
-        );
-        assert_eq!(
-            MacAddr::try_from("11-22-33-44-55-66"),
-            Ok(MacAddr {
-                data: [0x11, 0x22, 0x33, 0x44, 0x55, 0x66]
-            })
-        );
-        assert_eq!(
-            MacAddr::try_from("a-b-c-d-e-f").unwrap().to_string(),
-            String::from("0a:0b:0c:0d:0e:0f")
-        );
-        assert!(MacAddr::try_from("invalid-mac-addr").is_err());
-    }
 }
 
 /// Network device
@@ -242,7 +221,6 @@ pub enum Connection {
     Ethernet(EthernetConnection),
     Wireless(WirelessConnection),
     Loopback(LoopbackConnection),
-    Bond(BondConnection),
 }
 
 impl Connection {
@@ -258,10 +236,6 @@ impl Connection {
             }),
             DeviceType::Loopback => Connection::Loopback(LoopbackConnection { base }),
             DeviceType::Ethernet => Connection::Ethernet(EthernetConnection { base }),
-            DeviceType::Bond => Connection::Bond(BondConnection {
-                base,
-                ..Default::default()
-            }),
         }
     }
 
@@ -272,7 +246,6 @@ impl Connection {
             Connection::Ethernet(conn) => &conn.base,
             Connection::Wireless(conn) => &conn.base,
             Connection::Loopback(conn) => &conn.base,
-            Connection::Bond(conn) => &conn.base,
         }
     }
 
@@ -281,7 +254,6 @@ impl Connection {
             Connection::Ethernet(conn) => &mut conn.base,
             Connection::Wireless(conn) => &mut conn.base,
             Connection::Loopback(conn) => &mut conn.base,
-            Connection::Bond(conn) => &mut conn.base,
         }
     }
 
@@ -336,37 +308,6 @@ impl Connection {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum ParentKind {
-    Bond,
-}
-
-impl fmt::Display for ParentKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match &self {
-            ParentKind::Bond => "bond",
-        };
-        write!(f, "{}", name)
-    }
-}
-
-impl FromStr for ParentKind {
-    type Err = NetworkStateError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "bond" => Ok(ParentKind::Bond),
-            _ => Err(NetworkStateError::UnknownParentKind(s.to_string())),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Parent {
-    pub interface: String,
-    pub kind: ParentKind,
-}
-
 #[derive(Debug, Default, Clone)]
 pub struct BaseConnection {
     pub id: String,
@@ -375,7 +316,6 @@ pub struct BaseConnection {
     pub status: Status,
     pub interface: String,
     pub match_config: MatchConfig,
-    pub parent: Option<Parent>,
 }
 
 impl PartialEq for BaseConnection {
@@ -540,55 +480,6 @@ pub struct LoopbackConnection {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct BondConnection {
-    pub base: BaseConnection,
-    pub bond: BondConfig,
-}
-
-#[derive(Debug, Default, PartialEq, Clone)]
-pub struct MacAddr {
-    pub data: [u8; 6],
-}
-
-impl TryFrom<&str> for MacAddr {
-    type Error = &'static str;
-
-    fn try_from(str: &str) -> Result<Self, Self::Error> {
-        let mut ret: [u8; 6] = [0; 6];
-
-        let split = str.split([':', '-']);
-
-        for (i, s) in split.into_iter().enumerate() {
-            if i >= ret.len() {
-                return Err("The given string doesn't match xx:xx:xx:xx:xx:xx");
-            }
-            match u8::from_str_radix(s, 16) {
-                Ok(v) => ret[i] = v,
-                _ => return Err("Unable to parse hex number"),
-            };
-        }
-
-        Ok(MacAddr { data: ret })
-    }
-}
-
-impl fmt::Display for MacAddr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            self.data[0], self.data[1], self.data[2], self.data[3], self.data[4], self.data[5]
-        )
-    }
-}
-
-#[derive(Debug, Default, PartialEq, Clone)]
-pub struct BondConfig {
-    pub options: HashMap<String, String>,
-    pub hwaddr: Option<MacAddr>,
-}
-
-#[derive(Debug, Default, Clone, PartialEq)]
 pub struct WirelessConfig {
     pub mode: WirelessMode,
     pub ssid: SSID,

@@ -29,7 +29,6 @@ pub enum DeviceType {
     Loopback = 0,
     Ethernet = 1,
     Wireless = 2,
-    Bond = 3,
 }
 
 #[derive(Debug, Error, PartialEq)]
@@ -44,7 +43,6 @@ impl TryFrom<u8> for DeviceType {
             0 => Ok(DeviceType::Loopback),
             1 => Ok(DeviceType::Ethernet),
             2 => Ok(DeviceType::Wireless),
-            3 => Ok(DeviceType::Bond),
             _ => Err(InvalidDeviceType(value)),
         }
     }
