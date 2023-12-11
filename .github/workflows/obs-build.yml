@@ -38,14 +38,22 @@ jobs:
       - name: Configure osc
         run: .github/workflows/configure_osc.sh
         env:
-          OBS_USER:     jcronenberg_bot
+          OBS_USER:     ${{ secrets.OBS_USER }}
           OBS_PASSWORD: ${{ secrets.OBS_PW }}
 
       - name: Checkout package
         run: osc checkout home:jcronenberg:migrate-wicked/migrate-wicked-git -o migrate-wicked-git-package
 
+      - name: Remove current obscpio
+        run: rm -f *.obscpio
+        working-directory: ./migrate-wicked-git-package
+
       - name: Run osc service manualrun
         run: osc service manualrun
+        working-directory: ./migrate-wicked-git-package
+
+      - name: Update current files in osc
+        run: osc ar
         working-directory: ./migrate-wicked-git-package
 
       - name: Commit to OBS
