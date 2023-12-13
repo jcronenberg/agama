@@ -1,4 +1,6 @@
-use agama_dbus_server::network::model::{self, IpConfig, IpRoute, Ipv4Method, Ipv6Method};
+use agama_dbus_server::network::model::{
+    self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress,
+};
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};
 use serde_with::{
@@ -24,6 +26,8 @@ pub struct Interface {
     pub ipv6_dhcp: Option<Ipv6Dhcp>,
     #[serde(rename = "ipv6-auto", skip_serializing_if = "Option::is_none")]
     pub ipv6_auto: Option<Ipv6Auto>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dummy: Option<Dummy>,
     #[serde(rename = "@origin")]
     pub origin: String,
 }
@@ -110,6 +114,12 @@ pub struct Ipv6Auto {
     pub update: Vec<String>,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+pub struct Dummy {
+    pub address: Option<String>,
+}
+
 #[derive(Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
 #[strum(serialize_all = "kebab_case")]
 pub enum FailOverMac {
@@ -145,15 +155,27 @@ pub struct IpConfigResult {
 impl Interface {
     pub fn to_connection(&self) -> Result<ConnectionResult, anyhow::Error> {
         let ip_config = self.to_ip_config()?;
-        let base = model::BaseConnection {
+        let mut base = model::BaseConnection {
             id: self.name.clone(),
             interface: self.name.clone(),
             ip_config: ip_config.ip_config,
             ..Default::default()
         };
 
+        if let Some(dummy) = &self.dummy {
+            if let Some(address) = &dummy.address {
+                base.mac_address = MacAddress::from_str(address)?;
+            }
+        }
+
+        let connection = if self.dummy.is_some() {
+            model::Connection::Dummy(model::DummyConnection { base })
+        } else {
+            model::Connection::Ethernet(model::EthernetConnection { base })
+        };
+
         Ok(ConnectionResult {
-            connection: model::Connection::Ethernet(model::EthernetConnection { base }),
+            connection,
             warnings: ip_config.warnings,
         })
     }
@@ -416,5 +438,22 @@ mod tests {
         assert_eq!(static_connection.base().ip_config.method4, Ipv4Method::Auto);
         assert_eq!(static_connection.base().ip_config.method6, Ipv6Method::Auto);
         assert_eq!(static_connection.base().ip_config.addresses.len(), 0);
+    }
+
+    #[test]
+    fn test_dummy_interface_to_connection() {
+        let dummy_interface = Interface {
+            dummy: Some(Dummy {
+                address: Some("12:34:56:78:9A:BC".to_string()),
+            }),
+            ..Default::default()
+        };
+
+        let connection: model::Connection = dummy_interface.to_connection().unwrap().connection;
+        assert!(matches!(connection, model::Connection::Dummy(_)));
+        assert_eq!(
+            connection.base().mac_address.to_string(),
+            "12:34:56:78:9A:BC"
+        );
     }
 }
