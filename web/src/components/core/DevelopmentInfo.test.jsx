@@ -22,9 +22,42 @@
 import React from "react";
 import { screen } from "@testing-library/react";
 import { plainRender } from "~/test-utils";
-import { NotificationMark } from "~/components/core";
+import { DevelopmentInfo } from "~/components/core";
 
-it("renders a span with status role", async () => {
-  plainRender(<NotificationMark aria-label="See issues" />);
-  await screen.findByRole("status", { name: "See issues" });
+const originalEnv = process.env;
+
+describe("DevelopmentInfo", () => {
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  describe("when not running in development mode", () => {
+    beforeEach(() => {
+      process.env = {
+        ...originalEnv,
+        WEBPACK_SERVE: false
+      };
+    });
+
+    it("renders nothing", () => {
+      const { container } = plainRender(<DevelopmentInfo />);
+      expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  describe("when running in development mode", () => {
+    beforeEach(() => {
+      process.env = {
+        ...originalEnv,
+        WEBPACK_SERVE: true
+      };
+    });
+
+    it("renders Cockpit server url", () => {
+      plainRender(<DevelopmentInfo />);
+      screen.getByText("Cockpit server:");
+    });
+
+    // TODO: write tests checking the right url is rendered
+  });
 });

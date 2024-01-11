@@ -20,7 +20,7 @@
  */
 
 export { default as About } from "./About";
-export { default as PageOptions } from "./PageOptions";
+export { default as PageMenu } from "./PageMenu";
 export { default as DBusError } from "./DBusError";
 export { default as Description } from "./Description";
 export { default as Disclosure } from "./Disclosure";
@@ -36,8 +36,7 @@ export { default as Installation } from "./Installation";
 export { default as InstallationFinished } from "./InstallationFinished";
 export { default as InstallationProgress } from "./InstallationProgress";
 export { default as InstallButton } from "./InstallButton";
-export { default as IssuesLink } from "./IssuesLink";
-export { default as IssuesPage } from "./IssuesPage";
+export { default as IssuesDialog } from "./IssuesDialog";
 export { default as SectionSkeleton } from "./SectionSkeleton";
 export { default as ListSearch } from "./ListSearch";
 export { default as LogsButton } from "./LogsButton";
@@ -53,6 +52,6 @@ export { default as ValidationErrors } from "./ValidationErrors";
 export { default as Terminal } from "./Terminal";
 export { default as Tip } from "./Tip";
 export { default as ShowTerminalButton } from "./ShowTerminalButton";
-export { default as NotificationMark } from "./NotificationMark";
 export { default as NumericTextInput } from "./NumericTextInput";
 export { default as PasswordInput } from "./PasswordInput";
+export { default as DevelopmentInfo } from "./DevelopmentInfo";

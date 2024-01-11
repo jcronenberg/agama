@@ -126,7 +126,7 @@ export default function SoftwareSection({ showErrors }) {
           <Button
             isInline
             variant="link"
-            icon={<Icon name="refresh" size="16" />}
+            icon={<Icon name="refresh" size="xxs" />}
             onClick={probe}
           >
             {/* TRANSLATORS: clickable link label */}
@@ -146,6 +146,7 @@ export default function SoftwareSection({ showErrors }) {
       errors={errors.map(toValidationError)}
       // do not display the pattern selector when there are no patterns to display
       path={Object.keys(state.patterns).length > 0 ? "/software" : null}
+      id="software"
     >
       <SectionContent />
     </Section>

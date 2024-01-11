@@ -23,37 +23,26 @@ import React, { useState } from "react";
 import { useInstallerClient } from "~/context/installer";
 
 import { Button } from "@patternfly/react-core";
-import { useNavigate } from "react-router-dom";
 
 import { If, Popup } from "~/components/core";
 import { _ } from "~/i18n";
 
 const InstallConfirmationPopup = ({ hasIssues, onAccept, onClose }) => {
-  const navigate = useNavigate();
-
   const IssuesWarning = () => {
-    const IssuesLink = ({ text }) => {
-      return (
-        <Button variant="link" isInline onClick={() => navigate("/issues")}>
-          {text}
-        </Button>
-      );
-    };
-
     // TRANSLATORS: the installer reports some errors,
-    // the text in square brackets [] is a clickable link
-    const [msgStart, msgLink, msgEnd] = _("There are some reported issues. \
-Please, check [the list of issues] \
-before proceeding with the installation.").split(/[[\]]/);
 
     return (
-      <p className="bold">
-        {msgStart}
-        <IssuesLink text={msgLink} />
-        {msgEnd}
+      <p>
+        <strong>
+          { _("There are some reported issues. \
+Please review them in the previous steps before proceeding with the installation.") }
+        </strong>
       </p>
     );
   };
+
+  const Cancel = hasIssues ? Popup.PrimaryAction : Popup.SecondaryAction;
+  const Continue = hasIssues ? Popup.SecondaryAction : Popup.PrimaryAction;
 
   return (
     <Popup
@@ -71,11 +60,14 @@ according to the provided installation settings.") }
         </p>
       </div>
       <Popup.Actions>
-        <Popup.Confirm onClick={onAccept}>
+        <Cancel key="cancel" onClick={onClose} autoFocus={hasIssues}>
+          {/* TRANSLATORS: button label */}
+          {_("Cancel")}
+        </Cancel>
+        <Continue key="confirm" onClick={onAccept} autoFocus={!hasIssues}>
           {/* TRANSLATORS: button label */}
           {_("Continue")}
-        </Popup.Confirm>
-        <Popup.Cancel onClick={onClose} autoFocus />
+        </Continue>
       </Popup.Actions>
     </Popup>
   );
