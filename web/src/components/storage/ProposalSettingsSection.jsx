@@ -39,9 +39,9 @@ import { Icon } from "~/components/layout";
 import { noop } from "~/utils";
 
 /**
- * @typedef {import ("~/clients/storage").ProposalSettings} ProposalSettings
- * @typedef {import ("~/clients/storage").StorageDevice} StorageDevice
- * @typedef {import ("~/clients/storage").Volume} Volume
+ * @typedef {import ("~/client/storage").ProposalManager.ProposalSettings} ProposalSettings
+ * @typedef {import ("~/client/storage").DevicesManager.StorageDevice} StorageDevice
+ * @typedef {import ("~/client/storage").ProposalManager.Volume} Volume
  */
 
 /**
@@ -151,7 +151,7 @@ const InstallationDeviceField = ({
       >
         <If
           condition={devices.length === 0}
-          then={<div className="bold">{_("No devices found")}</div>}
+          then={_("No devices found.")}
           else={
             <InstallationDeviceForm
               id="bootDeviceForm"
@@ -323,7 +323,7 @@ created in a logical volume of the system volume group.");
         position="right"
       >
         <button aria-label={_("LVM settings")} className="plain-control" onClick={openForm}>
-          <Icon name="tune" size={24} />
+          <Icon name="tune" size="s" />
         </button>
       </Tooltip>
     );
@@ -477,7 +477,7 @@ const EncryptionPasswordField = ({
         position="right"
       >
         <button aria-label={_("Encryption settings")} className="plain-control" onClick={openForm}>
-          <Icon name="tune" size={24} />
+          <Icon name="tune" size="s" />
         </button>
       </Tooltip>
     );

@@ -22,12 +22,10 @@
 // cspell:ignore wwpns npiv
 
 import React, { useCallback, useEffect, useReducer, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button, Skeleton, Toolbar, ToolbarContent, ToolbarItem } from "@patternfly/react-core";
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 
 import { _ } from "~/i18n";
-import { MainActions } from "~/components/layout";
 import { If, Page, Popup, RowActions, Section, SectionSkeleton } from "~/components/core";
 import { ZFCPDiskForm } from "~/components/storage";
 import { noop, useCancellablePromise } from "~/utils";
@@ -416,7 +414,7 @@ const ControllersSection = ({ client, manager, load = noop, isLoading = false })
   const EmptyState = () => {
     return (
       <div className="stack">
-        <div className="bold">{_("No zFCP controllers found")}</div>
+        <div>{_("No zFCP controllers found.")}</div>
         <div>{_("Please, try to read the zFCP devices again.")}</div>
         {/* TRANSLATORS: button label */}
         <Button variant="primary" onClick={load}>{_("Read zFCP devices")}</Button>
@@ -552,7 +550,7 @@ const DisksSection = ({ client, manager, isLoading = false }) => {
 
     return (
       <div className="stack">
-        <div className="bold">{_("No zFCP disks found")}</div>
+        <div>{_("No zFCP disks found.")}</div>
         <If
           condition={manager.getActiveControllers().length === 0}
           then={<NoActiveControllers />}
@@ -666,7 +664,6 @@ const initialState = {
  */
 export default function ZFCPPage() {
   const { storage: client } = useInstallerClient();
-  const navigate = useNavigate();
   const { cancellablePromise } = useCancellablePromise();
   const [state, dispatch] = useReducer(reducer, initialState);
 
@@ -731,11 +728,7 @@ export default function ZFCPPage() {
 
   return (
     // TRANSLATORS: page title
-    <Page title={_("Storage zFCP")} icon="hard_drive">
-      <MainActions>
-        <Button size="lg" variant="secondary" onClick={() => navigate("/storage")}>{_("Back")}</Button>
-      </MainActions>
-
+    <Page icon="hard_drive" title={_("Storage zFCP")}>
       <ControllersSection
         client={client.zfcp}
         manager={state.manager}

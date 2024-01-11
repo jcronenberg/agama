@@ -34,14 +34,13 @@ import "@patternfly/patternfly/patternfly-base.scss";
 import App from "~/App";
 import Main from "~/Main";
 import DevServerWrapper from "~/DevServerWrapper";
-import { Overview } from "~/components/overview";
+import { OverviewPage } from "~/components/overview";
 import { ProductPage, ProductSelectionPage } from "~/components/product";
 import { SoftwarePage } from "~/components/software";
 import { ProposalPage as StoragePage, ISCSIPage, DASDPage, ZFCPPage } from "~/components/storage";
 import { UsersPage } from "~/components/users";
 import { L10nPage } from "~/components/l10n";
 import { NetworkPage } from "~/components/network";
-import { IssuesPage } from "~/components/core";
 
 /**
  * As JSX components might import CSS stylesheets, our styles must be imported
@@ -73,8 +72,8 @@ root.render(
         <Routes>
           <Route path="/" element={<App />}>
             <Route path="/" element={<Main />}>
-              <Route index element={<Overview />} />
-              <Route path="/overview" element={<Overview />} />
+              <Route index element={<OverviewPage />} />
+              <Route path="/overview" element={<OverviewPage />} />
               <Route path="/product" element={<ProductPage />} />
               <Route path="/l10n" element={<L10nPage />} />
               <Route path="/software" element={<SoftwarePage />} />
@@ -84,7 +83,6 @@ root.render(
               <Route path="/storage/zfcp" element={<ZFCPPage />} />
               <Route path="/network" element={<NetworkPage />} />
               <Route path="/users" element={<UsersPage />} />
-              <Route path="/issues" element={<IssuesPage />} />
             </Route>
             <Route path="products" element={<ProductSelectionPage />} />
           </Route>
