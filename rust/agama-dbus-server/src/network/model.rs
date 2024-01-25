@@ -378,6 +378,7 @@ pub struct Connection {
     pub status: Status,
     pub interface: Option<String>,
     pub controller: Option<Uuid>,
+    pub port_config: PortConfig,
     pub match_config: MatchConfig,
     pub config: ConnectionConfig,
 }
@@ -396,6 +397,8 @@ impl Connection {
             DeviceType::Loopback => ConnectionConfig::Loopback,
             DeviceType::Dummy => ConnectionConfig::Dummy,
             DeviceType::Bond => ConnectionConfig::Bond(Default::default()),
+            DeviceType::Vlan => ConnectionConfig::Vlan(Default::default()),
+            DeviceType::Bridge => ConnectionConfig::Bridge(Default::default()),
         };
         Self {
             id,
@@ -434,6 +437,8 @@ impl Connection {
             || matches!(self.config, ConnectionConfig::Ethernet)
             || matches!(self.config, ConnectionConfig::Dummy)
             || matches!(self.config, ConnectionConfig::Bond(_))
+            || matches!(self.config, ConnectionConfig::Vlan(_))
+            || matches!(self.config, ConnectionConfig::Bridge(_))
     }
 }
 
@@ -447,6 +452,7 @@ impl Default for Connection {
             status: Default::default(),
             interface: Default::default(),
             controller: Default::default(),
+            port_config: Default::default(),
             match_config: Default::default(),
             config: Default::default(),
         }
@@ -461,6 +467,15 @@ pub enum ConnectionConfig {
     Loopback,
     Dummy,
     Bond(BondConfig),
+    Vlan(VlanConfig),
+    Bridge(BridgeConfig),
+}
+
+#[derive(Default, Debug, PartialEq, Clone)]
+pub enum PortConfig {
+    #[default]
+    None,
+    Bridge(BridgePortConfig),
 }
 
 impl From<BondConfig> for ConnectionConfig {
@@ -680,6 +695,46 @@ impl From<&IpRoute> for HashMap<&str, Value<'_>> {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
+pub enum VlanProtocol {
+    #[default]
+    IEEE802_1Q,
+    IEEE802_1ad,
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid VlanProtocol: {0}")]
+pub struct InvalidVlanProtocol(String);
+
+impl std::str::FromStr for VlanProtocol {
+    type Err = InvalidVlanProtocol;
+
+    fn from_str(s: &str) -> Result<VlanProtocol, Self::Err> {
+        match s {
+            "802.1Q" => Ok(VlanProtocol::IEEE802_1Q),
+            "802.1ad" => Ok(VlanProtocol::IEEE802_1ad),
+            _ => Err(InvalidVlanProtocol(s.to_string())),
+        }
+    }
+}
+
+impl fmt::Display for VlanProtocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match &self {
+            VlanProtocol::IEEE802_1Q => "802.1Q",
+            VlanProtocol::IEEE802_1ad => "802.1ad",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct VlanConfig {
+    pub parent: String,
+    pub id: u32,
+    pub protocol: VlanProtocol,
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct WirelessConfig {
     pub mode: WirelessMode,
     pub ssid: SSID,
@@ -830,4 +885,20 @@ impl TryFrom<ConnectionConfig> for BondConfig {
             _ => Err(NetworkStateError::UnexpectedConfiguration),
         }
     }
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct BridgeConfig {
+    pub stp: bool,
+    pub priority: Option<u32>,
+    pub forward_delay: Option<u32>,
+    pub hello_time: Option<u32>,
+    pub max_age: Option<u32>,
+    pub ageing_time: Option<u32>,
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct BridgePortConfig {
+    pub priority: Option<u32>,
+    pub path_cost: Option<u32>,
 }
