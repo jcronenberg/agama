@@ -38,6 +38,8 @@ pub struct Network {
     #[serde(rename = "access-point")]
     pub access_point: Option<String>,
     pub wep: Option<Wep>,
+    #[serde(rename = "wpa-eap")]
+    pub wpa_eap: Option<WpaEap>,
 }
 
 #[derive(Default, Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
@@ -71,6 +73,107 @@ pub struct Wep {
     #[serde(rename = "default-key")]
     pub default_key: u32,
     pub key: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct WpaEap {
+    pub method: EapMethod,
+    #[serde(rename = "auth-proto")]
+    pub auth_proto: EapAuthProto,
+    #[serde(rename = "pairwise-cipher")]
+    pub pairwise_cipher: EapPairwiseCipher,
+    #[serde(rename = "group-cipher")]
+    pub group_cipher: EapGroupCipher,
+    pub identity: String,
+    pub tls: Option<WickedTLS>,
+}
+
+#[derive(Default, Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
+#[strum(serialize_all = "kebab-case")]
+pub enum EapMethod {
+    #[default]
+    TLS,
+    PEAP,
+    TTLS,
+}
+
+#[derive(Default, Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
+// TODO i don't think this is correct
+// but tbh this is probably overkill anyway
+#[strum(serialize_all = "kebab-case")]
+pub enum EapAuthProto {
+    #[default]
+    WPA,
+    NONE,
+    MD5,
+    TLS,
+    PAP,
+    CHAP,
+    MSCHAP,
+    MSCHAPV2,
+    PEAP,
+    TTLS,
+    GTC,
+    OTP,
+    LEAP,
+    PSK,
+    PAX,
+    SAKE,
+    GPSK,
+    WSC,
+    IKEV2,
+    TNC,
+    FAST,
+    AKA,
+    AkaPrime,
+    SIM,
+}
+
+// TODO will have to look into wicked code into what options the "inner" and "outer" get translated
+impl TryFrom<EapAuthProto> for model::EAPMethod {
+    type Error = anyhow::Error;
+
+    fn try_from(value: EapAuthProto) -> Result<Self, Self::Error> {
+        match value {
+            EapAuthProto::LEAP => Ok(model::EAPMethod::LEAP),
+            EapAuthProto::MD5 => Ok(model::EAPMethod::MD5),
+            EapAuthProto::TLS => Ok(model::EAPMethod::TLS),
+            EapAuthProto::PEAP => Ok(model::EAPMethod::PEAP),
+            EapAuthProto::TTLS => Ok(model::EAPMethod::TTLS),
+            EapAuthProto::FAST => Ok(model::EAPMethod::FAST),
+            _ => Err(anyhow!("EAP auth-proto isn't supported by NetworkManager")),
+        }
+    }
+}
+
+#[derive(Default, Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
+#[strum(serialize_all = "UPPERCASE")]
+pub enum EapPairwiseCipher {
+    #[default]
+    TKIP,
+    CCMP,
+}
+
+#[derive(Default, Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
+#[strum(serialize_all = "UPPERCASE")]
+pub enum EapGroupCipher {
+    #[default]
+    TKIP,
+    CCMP,
+    WEP104,
+    WEP40,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct WickedTLS {
+    #[serde(rename = "ca-cert")]
+    pub ca_cert: String,
+    #[serde(rename = "client-cert")]
+    pub client_cert: String,
+    #[serde(rename = "client-key")]
+    pub client_key: String,
+    #[serde(rename = "client-key-passwd")]
+    pub client_key_passwd: String,
 }
 
 fn unwrap_wireless_networks<'de, D>(deserializer: D) -> Result<Option<Vec<Network>>, D::Error>
@@ -202,6 +305,7 @@ mod tests {
                     key_management: vec!["wpa-psk".to_string()],
                     access_point: None,
                     wep: None,
+                    wpa_eap: None,
                 }]),
                 ap_scan: 0,
             }),
@@ -252,6 +356,7 @@ mod tests {
                         default_key: 1,
                         key: vec!["01020304ff".to_string(), "s:hello".to_string()],
                     }),
+                    wpa_eap: None,
                 }]),
                 ap_scan: 0,
             }),

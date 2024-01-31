@@ -1040,3 +1040,45 @@ impl fmt::Display for InfinibandTransportMode {
         write!(f, "{}", name)
     }
 }
+
+#[derive(Debug, Default, Clone)]
+pub struct IEEE8021XConfig {
+    pub eap: Vec<EAPMethod>,
+    // TODO check if option is appropriate
+    pub identity: String,
+    // TODO check if option is appropriate
+    pub password: String,
+    pub ca_cert: Option<String>,
+    pub ca_cert_password: Option<String>,
+    pub client_cert: Option<String>,
+    pub client_cert_password: Option<String>,
+    pub private_key: Option<String>,
+    pub private_key_password: Option<String>,
+    pub anonymous_identity: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EAPMethod {
+    LEAP,
+    MD5,
+    TLS,
+    PEAP,
+    TTLS,
+    PWD,
+    FAST,
+}
+
+impl fmt::Display for EAPMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match &self {
+            Self::LEAP => "leap",
+            Self::MD5 => "md5",
+            Self::TLS => "tls",
+            Self::PEAP => "peap",
+            Self::TTLS => "ttls",
+            Self::PWD => "pwd",
+            Self::FAST => "fast",
+        };
+        write!(f, "{}", value)
+    }
+}

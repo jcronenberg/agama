@@ -75,3 +75,41 @@
     <enabled>false</enabled>
   </ipv6>
 </interface>
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-wlan2">
+  <name>wlan2</name>
+  <control>
+    <mode>manual</mode>
+  </control>
+  <firewall/>
+  <wireless>
+    <ap-scan>1</ap-scan>
+    <networks>
+      <network>
+        <essid>test</essid>
+        <scan-ssid>true</scan-ssid>
+        <mode>ap</mode>
+        <access-point>12:34:56:78:9a:bc</access-point>
+        <wpa-eap>
+          <method>tls</method>
+          <auth-proto>wpa</auth-proto>
+          <pairwise-cipher>TKIP</pairwise-cipher>
+          <group-cipher>TKIP</group-cipher>
+          <identity>test</identity>
+          <tls>
+            <ca-cert type="path">/etc/sysconfig/network/./ca_cert</ca-cert>
+            <client-cert type="path">/etc/sysconfig/network/./client_cert</client-cert>
+            <client-key type="path">/etc/sysconfig/network/./client_key</client-key>
+            <client-key-passwd>testclientpw</client-key-passwd>
+          </tls>
+        </wpa-eap>
+      </network>
+    </networks>
+  </wireless>
+  <link/>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>
