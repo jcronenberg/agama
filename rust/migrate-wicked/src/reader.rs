@@ -1,5 +1,5 @@
 use crate::interface::Interface;
-use crate::netconfig::read_netconfig;
+use crate::netconfig::{read_netconfig, Netconfig};
 use crate::MIGRATION_SETTINGS;
 
 use regex::Regex;
@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 pub struct InterfacesResult {
     pub interfaces: Vec<Interface>,
-    pub static_dns_servers: Option<Vec<String>>,
+    pub netconfig: Netconfig,
     pub warning: Option<anyhow::Error>,
 }
 
@@ -31,7 +31,7 @@ pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
     })?;
     let mut result = InterfacesResult {
         interfaces,
-        static_dns_servers: None,
+        netconfig: Netconfig::default(),
         warning: None,
     };
     if !unhandled_fields.is_empty() {
@@ -80,18 +80,17 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
     let settings = MIGRATION_SETTINGS.get().unwrap();
     let mut result = InterfacesResult {
         interfaces: vec![],
-        static_dns_servers: None,
+        netconfig: Netconfig::default(),
         warning: None,
     };
 
-    result.static_dns_servers = match read_netconfig(settings.netconfig_path.clone()) {
-        Ok(dns) => dns,
+    match read_netconfig(settings.netconfig_path.clone()) {
+        Ok(netconfig) => result.netconfig = netconfig,
         Err(e) => {
             if !settings.continue_migration {
                 return Err(e);
             };
             log::warn!("Failed to read netconfig: {}", e);
-            None
         }
     };
 

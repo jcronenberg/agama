@@ -115,17 +115,15 @@ impl Adapter for WickedAdapter {
         }
 
         if !settings.dry_run {
-            if let Some(static_dns_servers) = interfaces.static_dns_servers {
-                if let Err(e) =
-                    write_nmconf_netconfig(static_dns_servers, settings.nm_dropin_dir.clone())
-                {
-                    if !settings.continue_migration {
-                        return Err(anyhow::anyhow!("Failed to write dns config: {}", e).into());
-                    } else {
-                        log::warn!("Failed to write dns config: {}", e);
-                    }
-                };
-            }
+            if let Err(e) =
+                write_nmconf_netconfig(interfaces.netconfig, settings.nm_dropin_dir.clone())
+            {
+                if !settings.continue_migration {
+                    return Err(anyhow::anyhow!("Failed to write dns config: {}", e).into());
+                } else {
+                    log::warn!("Failed to write dns config: {}", e);
+                }
+            };
         }
 
         update_parent_connection(&mut state, parents)?;

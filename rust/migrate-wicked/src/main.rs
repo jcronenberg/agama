@@ -16,6 +16,7 @@ use std::process::{ExitCode, Termination};
 use tokio::sync::OnceCell;
 
 use crate::interface::Interface;
+use crate::netconfig::Netconfig;
 
 #[derive(Parser)]
 #[command(name = "migrate-wicked", version, about, long_about = None)]
@@ -98,11 +99,11 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             #[derive(Debug, Serialize)]
             struct WickedConfig {
                 interface: Vec<Interface>,
-                static_dns_servers: Option<Vec<String>>,
+                netconfig: Netconfig,
             }
             let show_output = WickedConfig {
                 interface: interfaces_result.interfaces,
-                static_dns_servers: interfaces_result.static_dns_servers,
+                netconfig: interfaces_result.netconfig,
             };
 
             let output = match format {
