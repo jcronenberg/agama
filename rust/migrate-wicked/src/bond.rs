@@ -333,6 +333,8 @@ mod tests {
             continue_migration: false,
             dry_run: false,
             activate_connections: true,
+            netconfig_path: "".to_string(),
+            nm_dropin_dir: "".to_string(),
         });
     }
 
