@@ -97,6 +97,9 @@ pub fn connection_to_dbus<'a>(
             connection_dbus.insert("type", BRIDGE_KEY.into());
             result.insert(BRIDGE_KEY, bridge_config_to_dbus(bridge));
         }
+        ConnectionConfig::Loopback => {
+            connection_dbus.insert("type", LOOPBACK_KEY.into());
+        }
         _ => {}
     }
 
