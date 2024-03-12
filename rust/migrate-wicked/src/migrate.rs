@@ -1,7 +1,10 @@
 use crate::bridge::BridgePort;
 use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
+use agama_dbus_server::network::model::{Connection, IpConfig, MatchConfig};
 use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use async_trait::async_trait;
+use cidr::IpInet;
+use std::str::FromStr;
 use std::{collections::HashMap, error::Error};
 use uuid::Uuid;
 
@@ -118,7 +121,10 @@ impl Adapter for WickedAdapter {
         }
 
         if let Some(netconfig) = interfaces.netconfig {
-            let mut loopback = self.current_state.get_connection("lo").unwrap().clone();
+            let mut loopback = match self.current_state.get_connection("lo") {
+                Some(lo) => lo.clone(),
+                None => create_lo_connection(),
+            };
             loopback.ip_config.nameservers = match netconfig.static_dns_servers() {
                 Ok(nameservers) => nameservers,
                 Err(e) => {
@@ -148,6 +154,25 @@ impl Adapter for WickedAdapter {
         _network: &model::NetworkState,
     ) -> Result<(), Box<dyn std::error::Error>> {
         unimplemented!("not needed");
+    }
+}
+
+fn create_lo_connection() -> Connection {
+    Connection {
+        id: "lo".to_string(),
+        ip_config: IpConfig {
+            method4: model::Ipv4Method::Manual,
+            method6: model::Ipv6Method::Manual,
+            addresses: vec![
+                IpInet::from_str("127.0.0.1/8").unwrap(),
+                IpInet::from_str("::1/128").unwrap(),
+            ],
+            ..Default::default()
+        },
+        interface: Some("lo".to_string()),
+        match_config: MatchConfig::default(),
+        config: model::ConnectionConfig::Loopback,
+        ..Default::default()
     }
 }
 
