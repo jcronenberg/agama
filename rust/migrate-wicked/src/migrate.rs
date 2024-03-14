@@ -1,17 +1,24 @@
 use crate::bridge::BridgePort;
 use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
+use agama_dbus_server::network::model::{Connection, IpConfig, MatchConfig};
 use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use async_trait::async_trait;
+use cidr::IpInet;
+use std::str::FromStr;
 use std::{collections::HashMap, error::Error};
 use uuid::Uuid;
 
 struct WickedAdapter {
     paths: Vec<String>,
+    current_state: NetworkState,
 }
 
 impl WickedAdapter {
-    pub fn new(paths: Vec<String>) -> Self {
-        Self { paths }
+    pub fn new(paths: Vec<String>, current_state: NetworkState) -> Self {
+        Self {
+            paths,
+            current_state,
+        }
     }
 }
 
@@ -113,6 +120,34 @@ impl Adapter for WickedAdapter {
             state.add_connection(connection_result.connection)?;
         }
 
+        if let Some(netconfig) = interfaces.netconfig {
+            let mut loopback = match self.current_state.get_connection("lo") {
+                Some(lo) => lo.clone(),
+                None => create_lo_connection(),
+            };
+            loopback.ip_config.nameservers = match netconfig.static_dns_servers() {
+                Ok(nameservers) => nameservers,
+                Err(e) => {
+                    let error = anyhow::anyhow!("Error when parsing static DNS servers: {}", e);
+                    if !settings.continue_migration {
+                        return Err(error.into());
+                    } else {
+                        log::warn!("{}", error);
+                        vec![]
+                    }
+                }
+            };
+            if let Some(static_dns_searchlist) = netconfig.static_dns_searchlist {
+                loopback.ip_config.dns_searchlist = static_dns_searchlist;
+            }
+
+            for con in state.connections.iter_mut() {
+                con.ip_config.ignore_auto_dns = true;
+            }
+
+            state.add_connection(loopback)?;
+        }
+
         update_parent_connection(&mut state, parents)?;
         update_bridge_ports(&mut state, bridge_ports)?;
 
@@ -127,8 +162,29 @@ impl Adapter for WickedAdapter {
     }
 }
 
+fn create_lo_connection() -> Connection {
+    Connection {
+        id: "lo".to_string(),
+        ip_config: IpConfig {
+            method4: model::Ipv4Method::Manual,
+            method6: model::Ipv6Method::Manual,
+            addresses: vec![
+                IpInet::from_str("127.0.0.1/8").unwrap(),
+                IpInet::from_str("::1/128").unwrap(),
+            ],
+            ..Default::default()
+        },
+        interface: Some("lo".to_string()),
+        match_config: MatchConfig::default(),
+        config: model::ConnectionConfig::Loopback,
+        ..Default::default()
+    }
+}
+
 pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
-    let wicked = WickedAdapter::new(paths);
+    let nm = NetworkManagerAdapter::from_system().await?;
+    let current_state = nm.read().await?;
+    let wicked = WickedAdapter::new(paths, current_state);
     let state = wicked.read().await?;
     let settings = MIGRATION_SETTINGS.get().unwrap();
     if settings.dry_run {
@@ -137,7 +193,6 @@ pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         return Ok(());
     }
-    let nm = NetworkManagerAdapter::from_system().await?;
     nm.write(&state).await?;
     Ok(())
 }

@@ -97,6 +97,9 @@ pub fn connection_to_dbus<'a>(
             connection_dbus.insert("type", BRIDGE_KEY.into());
             result.insert(BRIDGE_KEY, bridge_config_to_dbus(bridge));
         }
+        ConnectionConfig::Loopback => {
+            connection_dbus.insert("type", LOOPBACK_KEY.into());
+        }
         _ => {}
     }
 
@@ -250,9 +253,13 @@ fn ip_config_to_ipv4_dbus(ip_config: &IpConfig) -> HashMap<&str, zvariant::Value
         .collect::<Vec<_>>()
         .into();
 
+    let dns_searchlist: Value = ip_config.dns_searchlist.clone().into();
+
     let mut ipv4_dbus = HashMap::from([
         ("address-data", address_data),
         ("dns-data", dns_data),
+        ("dns-search", dns_searchlist),
+        ("ignore-auto-dns", ip_config.ignore_auto_dns.into()),
         ("method", ip_config.method4.to_string().into()),
     ]);
 
@@ -295,9 +302,13 @@ fn ip_config_to_ipv6_dbus(ip_config: &IpConfig) -> HashMap<&str, zvariant::Value
         .collect::<Vec<_>>()
         .into();
 
+    let dns_searchlist: Value = ip_config.dns_searchlist.clone().into();
+
     let mut ipv6_dbus = HashMap::from([
         ("address-data", address_data),
         ("dns-data", dns_data),
+        ("dns-search", dns_searchlist),
+        ("ignore-auto-dns", ip_config.ignore_auto_dns.into()),
         ("method", ip_config.method6.to_string().into()),
     ]);
 
@@ -596,6 +607,20 @@ fn ip_config_from_dbus(conn: &OwnedNestedHash) -> Option<IpConfig> {
             ip_config.nameservers.append(&mut servers);
         }
 
+        if let Some(dns_search) = ipv4.get("dns-search") {
+            let mut searchlist: Vec<String> = dns_search
+                .downcast_ref::<zbus::zvariant::Array>()?
+                .iter()
+                .flat_map(|x| x.downcast_ref::<str>())
+                .map(|x| x.to_string())
+                .collect();
+            ip_config.dns_searchlist.append(&mut searchlist);
+        }
+
+        if let Some(ignore_auto_dns) = ipv4.get("ignore-auto-dns") {
+            ip_config.ignore_auto_dns = ignore_auto_dns.try_into().ok()?;
+        }
+
         if let Some(route_data) = ipv4.get("route-data") {
             ip_config.routes4 = routes_from_dbus(route_data);
         }
@@ -620,6 +645,20 @@ fn ip_config_from_dbus(conn: &OwnedNestedHash) -> Option<IpConfig> {
             ip_config.nameservers.append(&mut servers);
         }
 
+        if let Some(dns_search) = ipv6.get("dns-search") {
+            let mut searchlist: Vec<String> = dns_search
+                .downcast_ref::<zbus::zvariant::Array>()?
+                .iter()
+                .flat_map(|x| x.downcast_ref::<str>())
+                .map(|x| x.to_string())
+                .collect();
+            ip_config.dns_searchlist.append(&mut searchlist);
+        }
+
+        if let Some(ignore_auto_dns) = ipv6.get("ignore-auto-dns") {
+            ip_config.ignore_auto_dns = ignore_auto_dns.try_into().ok()?;
+        }
+
         if let Some(route_data) = ipv6.get("route-data") {
             ip_config.routes6 = routes_from_dbus(route_data);
         }
@@ -629,6 +668,10 @@ fn ip_config_from_dbus(conn: &OwnedNestedHash) -> Option<IpConfig> {
             ip_config.gateway6 = Some(gateway.parse().unwrap());
         }
     }
+
+    // ensure only unique entries in dns_searchlist
+    ip_config.dns_searchlist.sort();
+    ip_config.dns_searchlist.dedup();
 
     Some(ip_config)
 }
@@ -881,6 +924,11 @@ mod test {
                 Value::new(vec!["192.168.0.2"]).to_owned(),
             ),
             (
+                "dns-search".to_string(),
+                Value::new(vec!["suse.com", "example.com"]).to_owned(),
+            ),
+            ("ignore-auto-dns".to_string(), Value::new(true).to_owned()),
+            (
                 "route-data".to_string(),
                 Value::new(route_v4_data).to_owned(),
             ),
@@ -911,6 +959,10 @@ mod test {
             (
                 "dns-data".to_string(),
                 Value::new(vec!["::ffff:c0a8:102"]).to_owned(),
+            ),
+            (
+                "dns-search".to_string(),
+                Value::new(vec!["suse.com", "suse.de"]).to_owned(),
             ),
             (
                 "route-data".to_string(),
@@ -954,6 +1006,13 @@ mod test {
                 "::ffff:c0a8:102".parse::<IpAddr>().unwrap()
             ]
         );
+        assert_eq!(ip_config.dns_searchlist.len(), 3);
+        assert!(ip_config.dns_searchlist.contains(&"suse.com".to_string()));
+        assert!(ip_config.dns_searchlist.contains(&"suse.de".to_string()));
+        assert!(ip_config
+            .dns_searchlist
+            .contains(&"example.com".to_string()));
+        assert!(ip_config.ignore_auto_dns);
         assert_eq!(ip_config.method4, Ipv4Method::Auto);
         assert_eq!(ip_config.method6, Ipv6Method::Auto);
         assert_eq!(
@@ -1322,6 +1381,7 @@ mod test {
                 next_hop: Some(IpAddr::from_str("2001:db8::1").unwrap()),
                 metric: Some(100),
             }]),
+            dns_searchlist: vec!["suse.com".to_string(), "suse.de".to_string()],
             ..Default::default()
         };
         let mac_address = MacAddress::from_str("FD:CB:A9:87:65:43").unwrap();
@@ -1368,6 +1428,26 @@ mod test {
             assert!(route4_hashmap.contains_key("metric"));
             assert_eq!(route4_hashmap["metric"], Value::from(100_u32));
         }
+        let dns_searchlist_array: Array = ipv4_dbus
+            .get("dns-search")
+            .unwrap()
+            .downcast_ref::<Value>()
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let dns_serachlist: Vec<String> = dns_searchlist_array
+            .iter()
+            .flat_map(|x| x.downcast_ref::<str>())
+            .map(|x| x.to_string())
+            .collect();
+        assert_eq!(dns_serachlist.len(), 2);
+        assert!(dns_serachlist.contains(&"suse.com".to_string()));
+        assert!(dns_serachlist.contains(&"suse.de".to_string()));
+        assert!(!ipv4_dbus
+            .get("ignore-auto-dns")
+            .unwrap()
+            .downcast_ref::<bool>()
+            .unwrap());
 
         let ipv6_dbus = conn_dbus.get("ipv6").unwrap();
         let gateway6: &str = ipv6_dbus.get("gateway").unwrap().downcast_ref().unwrap();
@@ -1391,5 +1471,25 @@ mod test {
             assert!(route6_hashmap.contains_key("metric"));
             assert_eq!(route6_hashmap["metric"], Value::from(100_u32));
         }
+        let dns_searchlist_array: Array = ipv6_dbus
+            .get("dns-search")
+            .unwrap()
+            .downcast_ref::<Value>()
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let dns_serachlist: Vec<String> = dns_searchlist_array
+            .iter()
+            .flat_map(|x| x.downcast_ref::<str>())
+            .map(|x| x.to_string())
+            .collect();
+        assert_eq!(dns_serachlist.len(), 2);
+        assert!(dns_serachlist.contains(&"suse.com".to_string()));
+        assert!(dns_serachlist.contains(&"suse.de".to_string()));
+        assert!(!ipv6_dbus
+            .get("ignore-auto-dns")
+            .unwrap()
+            .downcast_ref::<bool>()
+            .unwrap());
     }
 }

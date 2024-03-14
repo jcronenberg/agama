@@ -18,13 +18,6 @@ impl<'a> NetworkManagerAdapter<'a> {
         let client = NetworkManagerClient::from_system().await?;
         Ok(Self { client })
     }
-
-    /// Determines whether the write operation is supported for a connection
-    ///
-    /// * `conn`: connection
-    fn is_writable(conn: &Connection) -> bool {
-        !conn.is_loopback()
-    }
 }
 
 #[async_trait]
@@ -46,10 +39,6 @@ impl<'a> Adapter for NetworkManagerAdapter<'a> {
         // By now, traits do not support async functions. Using `task::block_on` allows
         // to use 'await'.
         for conn in ordered_connections(network) {
-            if !Self::is_writable(conn) {
-                continue;
-            }
-
             let result = if conn.is_removed() {
                 self.client.remove_connection(conn.uuid).await
             } else {
