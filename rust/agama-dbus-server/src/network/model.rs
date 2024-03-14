@@ -569,6 +569,7 @@ pub struct IpConfig {
     pub addresses: Vec<IpInet>,
     pub nameservers: Vec<IpAddr>,
     pub dns_searchlist: Vec<String>,
+    pub ignore_auto_dns: bool,
     pub gateway4: Option<IpAddr>,
     pub gateway6: Option<IpAddr>,
     pub routes4: Option<Vec<IpRoute>>,
