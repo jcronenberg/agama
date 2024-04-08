@@ -1,5 +1,5 @@
 /*
- * Copyright (c) [2022] SUSE LLC
+ * Copyright (c) [2022-2024] SUSE LLC
  *
  * All Rights Reserved.
  *
@@ -22,7 +22,11 @@
 export { default as ProposalPage } from "./ProposalPage";
 export { default as ProposalPageMenu } from "./ProposalPageMenu";
 export { default as ProposalSettingsSection } from "./ProposalSettingsSection";
-export { default as ProposalActionsSection } from "./ProposalActionsSection";
+export { default as ProposalSpacePolicyField } from "./ProposalSpacePolicyField";
+export { default as ProposalDeviceSection } from "./ProposalDeviceSection";
+export { default as ProposalTransactionalInfo } from "./ProposalTransactionalInfo";
+export { default as ProposalActionsDialog } from "./ProposalActionsDialog";
+export { default as ProposalResultSection } from "./ProposalResultSection";
 export { default as ProposalVolumes } from "./ProposalVolumes";
 export { default as DASDPage } from "./DASDPage";
 export { default as DASDTable } from "./DASDTable";
@@ -30,6 +34,9 @@ export { default as DASDFormatProgress } from "./DASDFormatProgress";
 export { default as ZFCPPage } from "./ZFCPPage";
 export { default as ZFCPDiskForm } from "./ZFCPDiskForm";
 export { default as ISCSIPage } from "./ISCSIPage";
-export { DeviceList, DeviceSelector } from "./device-utils";
-export { SpacePolicyButton, SpacePolicySelector, SpacePolicyDisksHint } from "./space-policy-utils";
+export { DeviceList, DeviceSelector, DeviceContentInfo, DeviceExtendedInfo, FilesystemLabel } from "./device-utils";
 export { default as VolumeForm } from "./VolumeForm";
+export { default as BootSelectionDialog } from "./BootSelectionDialog";
+export { default as DeviceSelectionDialog } from "./DeviceSelectionDialog";
+export { default as DeviceSelectorTable } from "./DeviceSelectorTable";
+export { default as DevicesFormSelect } from "./DevicesFormSelect";

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Copyright (c) [2023] SUSE LLC
+# Copyright (c) [2023-2024] SUSE LLC
 #
 # All Rights Reserved.
 #
@@ -21,12 +21,7 @@
 
 require "dbus"
 require "agama/dbus/base_object"
-require "agama/dbus/storage/interfaces/drive"
-require "agama/dbus/storage/interfaces/raid"
-require "agama/dbus/storage/interfaces/multipath"
-require "agama/dbus/storage/interfaces/md"
-require "agama/dbus/storage/interfaces/block"
-require "agama/dbus/storage/interfaces/partition_table"
+require "agama/dbus/storage/interfaces/device"
 
 module Agama
   module DBus
@@ -35,54 +30,66 @@ module Agama
       #
       # The D-Bus object includes the required interfaces for the storage object that it represents.
       class Device < BaseObject
+        # sid of the Y2Storage device.
+        #
+        # @note A Y2Storage device is a wrapper over a libstorage-ng object. If the source
+        #   devicegraph does not exist anymore (e.g., after reprobing), then the Y2Storage device
+        #   object cannot be used (memory error). The device sid is stored to avoid accessing to
+        #   the old Y2Storage device when updating the represented device, see {#storage_device=}.
+        #
+        # @return [Integer]
+        attr_reader :sid
+
         # Constructor
         #
         # @param storage_device [Y2Storage::Device] Storage device
         # @param path [::DBus::ObjectPath] Path for the D-Bus object
+        # @param tree [DevicesTree] D-Bus tree in which the device is exported
         # @param logger [Logger, nil]
-        def initialize(storage_device, path, logger: nil)
+        def initialize(storage_device, path, tree, logger: nil)
           super(path, logger: logger)
 
           @storage_device = storage_device
+          @sid = storage_device.sid
+          @tree = tree
           add_interfaces
+        end
+
+        # Sets the represented storage device.
+        #
+        # @note A properties changed signal is emitted for each interface.
+        # @raise [RuntimeError] If the given device has a different sid.
+        #
+        # @param value [Y2Storage::Device]
+        def storage_device=(value)
+          if value.sid != sid
+            raise "Cannot update the D-Bus object because the given device has a different sid: " \
+                  "#{value} instead of #{sid}"
+          end
+
+          @storage_device = value
+          @sid = value.sid
+
+          interfaces_and_properties.each do |interface, properties|
+            dbus_properties_changed(interface, properties, [])
+          end
         end
 
       private
 
+        # @return [DevicesTree]
+        attr_reader :tree
+
         # @return [Y2Storage::Device]
         attr_reader :storage_device
 
-        # Adds the required interfaces according to the storage object
-        def add_interfaces # rubocop:disable Metrics/CyclomaticComplexity
-          interfaces = []
-          interfaces << Interfaces::Drive if drive?
-          interfaces << Interfaces::Raid if storage_device.is?(:dm_raid)
-          interfaces << Interfaces::Md if storage_device.is?(:md)
-          interfaces << Interfaces::Multipath if storage_device.is?(:multipath)
-          interfaces << Interfaces::Block if storage_device.is?(:blk_device)
-          interfaces << Interfaces::PartitionTable if partition_table?
+        # Adds the required interfaces according to the storage object.
+        def add_interfaces
+          interfaces = Interfaces::Device.constants
+            .map { |c| Interfaces::Device.const_get(c) }
+            .select { |c| c.is_a?(Module) && c.respond_to?(:apply?) && c.apply?(storage_device) }
 
           interfaces.each { |i| singleton_class.include(i) }
-        end
-
-        # Whether the storage device is a drive
-        #
-        # Drive and disk device are very close concepts, but there are subtle differences. For
-        # example, a MD RAID is never considered as a drive.
-        #
-        # TODO: Revisit the defintion of drive. Maybe some MD devices could implement the drive
-        #   interface if hwinfo provides useful information for them.
-        #
-        # @return [Boolean]
-        def drive?
-          storage_device.is?(:disk, :dm_raid, :multipath, :dasd) && storage_device.is?(:disk_device)
-        end
-
-        # Whether the storage device has a partition table
-        #
-        # @return [Boolean]
-        def partition_table?
-          storage_device.is?(:blk_device) && storage_device.partition_table?
         end
       end
     end

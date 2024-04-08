@@ -108,6 +108,7 @@ module Agama
       def probe
         start_progress(4)
         config.pick_product(software.selected_product)
+        check_multipath
         progress.step(_("Activating storage devices")) { activate_devices }
         progress.step(_("Probing storage devices")) { probe_devices }
         progress.step(_("Calculating the storage proposal")) { calculate_proposal }
@@ -282,6 +283,23 @@ module Agama
       # @return [Agama::DBus::Clients::Questions]
       def questions_client
         @questions_client ||= Agama::DBus::Clients::Questions.new(logger: logger)
+      end
+
+      MULTIPATH_CONFIG = "/etc/multipath.conf"
+      # Checks if all requirement for multipath probing is correct and if not
+      # then log it
+      def check_multipath
+        # check if kernel module is loaded
+        mods = `lsmod`.lines.grep(/dm_multipath/)
+        logger.warn("dm_multipath modules is not loaded") if mods.empty?
+
+        binary = system("which multipath")
+        if binary
+          conf = `multipath -t`.lines.grep(/find_multipaths "smart"/)
+          logger.warn("multipath: find_multipaths is not set to 'smart'") if conf.empty?
+        else
+          logger.warn("multipath is not installed.")
+        end
       end
     end
   end

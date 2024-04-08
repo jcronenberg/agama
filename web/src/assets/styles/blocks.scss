@@ -15,27 +15,39 @@
   margin-inline-end: var(--section-icon-size);
 
   &:not(:last-child) {
-    margin-block-end: var(--spacer-normal);
+    margin-block-end: var(--spacer-medium);
   }
 
-  > h2 {
+  > header {
     display: grid;
     grid-area: header;
     grid-template-columns: subgrid;
     grid-column: bleed / content-end;
 
-    svg {
-      block-size: var(--section-icon-size);
-      inline-size: var(--section-icon-size);
-      grid-column: bleed / content;
+    h2 {
+      display: grid;
+      grid-template-columns: subgrid;
+      grid-column: bleed / content-end;
+
+      svg {
+        block-size: var(--section-icon-size);
+        inline-size: var(--section-icon-size);
+        grid-column: bleed / content;
+      }
+
+      :not(svg) {
+        grid-column: content
+      }
     }
 
-    :not(svg) {
-      grid-column: content
+    p {
+      grid-column: content;
+      color: var(--color-gray-dimmest);
+      margin-block-end: var(--spacer-smaller);
     }
   }
 
-  > :not(h2) {
+  > :not(header) {
     grid-area: content;
     grid-column: content;
   }
@@ -245,6 +257,10 @@ ul[data-type="agama/list"] {
       border-top: 0;
     }
 
+    &:not(:last-child) {
+      border-bottom-width: 1px;
+    }
+
     > div {
       margin-block-end: var(--spacer-smaller);
     }
@@ -259,21 +275,18 @@ ul[data-type="agama/list"] {
   // FIXME: see if it's semantically correct to mark an li as aria-selected when
   // not belongs to a listbox or grid list ul.
   li[aria-selected] {
-    border-color: var(--color-primary);
-    box-shadow: 0 2px 5px 0 var(--color-gray-dark);
-    background: var(--color-primary);
-    color: white;
+    background: var(--color-gray-dark);
     font-weight: 700;
 
-    svg {
-      fill: white;
+    &:not(:last-child) {
+      border-bottom-color: white;
     }
   }
 }
 
 // These attributes together means that UI is rendering a selector
-ul[data-type="agama/list"][role="listbox"] {
-  li[role="option"] {
+ul[data-type="agama/list"][role="grid"] {
+  li[role="row"] {
     cursor: pointer;
 
     &:first-child {
@@ -292,72 +305,84 @@ ul[data-type="agama/list"][role="listbox"] {
       &:not([aria-selected]) {
         background: var(--color-gray-dark);
       }
+
+      &:not(:last-child) {
+        border-bottom-color: white;
+      }
+    }
+
+    div[role="gridcell"] {
+      display: flex;
+      align-items: center;
+      gap: var(--spacer-normal);
+
+      & > input {
+        --size: var(--fs-h2);
+        block-size: var(--size);
+        inline-size: var(--size);
+      }
+
+      & > div {
+        flex: 1;
+      }
     }
   }
 }
 
 // Each kind of list/selector has its way of laying out their items
-ul[data-of="agama/storage-devices"] {
-  li {
-    display: grid;
-    gap: var(--spacer-smaller);
-    grid-template-columns: 1fr 2fr 2fr;
-    grid-template-areas: "type-and-size drive-info drive-content";
+[data-items-type="agama/storage-devices"] {
+  display: grid;
+  gap: var(--spacer-smaller);
+  grid-template-columns: 1fr 2fr 2fr;
+  grid-template-areas: "type-and-size drive-info drive-content";
 
-    svg {
-      vertical-align: inherit;
-    }
+  svg {
+    vertical-align: inherit;
+  }
 
-    > div {
-      margin-block-end: 0;
-    }
+  > div {
+    margin-block-end: 0;
+  }
 
-    > :first-child {
-      align-self: center;
-      text-align: center;
-      justify-self: start;
-    }
+  > :first-child {
+    align-self: center;
+    text-align: center;
+    justify-self: start;
   }
 }
 
-ul[data-of="agama/space-policies"] {
+[data-items-type="agama/space-policies"] {
   // It works with the default styling
 }
 
-ul[data-of="agama/locales"] {
-  li {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
+[data-items-type="agama/locales"] {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
 
-    > :last-child {
-      grid-column: 1 / -1;
-      font-size: var(--fs-small);
-    }
+  > :last-child {
+    grid-column: 1 / -1;
+    font-size: var(--fs-small);
   }
 }
 
-ul[data-of="agama/keymaps"] {
-  li {
-    > :last-child {
-      font-size: var(--fs-small);
-    }
+[data-items-type="agama/keymaps"] {
+  > :last-child {
+    font-size: var(--fs-small);
   }
 }
 
-ul[data-of="agama/timezones"] {
-  li {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+[data-items-type="agama/timezones"] {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
 
-    > :last-child {
-      grid-column: 1 / -1;
-      font-size: 80%;
-    }
+  > :last-child {
+    grid-column: 1 / -1;
+    font-size: 80%;
+  }
 
-    > :nth-child(3) {
-      color: var(--color-gray-dimmed);
-      text-align: end;
-    }
+  > :nth-child(3) {
+    color: var(--color-gray-dimmed);
+    text-align: end;
   }
 }
 
@@ -374,6 +399,190 @@ ul[data-of="agama/timezones"] {
       padding: var(--spacer-small);
       border: 1px solid var(--color-primary);
       border-radius: 5px;
+    }
+  }
+}
+
+[data-type="agama/tag"] {
+  font-size: var(--fs-small);
+
+  &[data-variant="teal"] {
+    color: var(--color-teal);
+  }
+
+  &[data-variant="orange"] {
+    color: var(--color-orange);
+  }
+
+  &[data-variant="gray-highlight"] {
+    padding: var(--spacer-smaller);
+    color: var(--color-gray-darkest);
+    background: var(--color-gray);
+    border: 1px solid var(--color-gray-dark);
+    border-radius: 5px;
+    margin-inline-start: var(--spacer-smaller);
+  }
+}
+
+[data-type="agama/controlled-panels"] {
+  [data-type="agama/option"] {
+    label, input {
+      cursor: pointer;
+    }
+
+    label {
+      display: flex;
+      gap: var(--spacer-smaller);
+    }
+  }
+
+  [data-variant="buttons"] {
+    input { position: absolute; opacity: 0 }
+
+    label {
+      border: 1px solid var(--color-primary);
+      padding: var(--spacer-small);
+      gap: var(--spacer-small);
+      border-radius: var(--spacer-smaller);
+      position: relative;
+
+      &:has(input:checked) {
+        background: var(--color-primary);
+        color: white;
+      }
+
+      &:has(input:focus-visible) {
+        // outline: 1px dotted;
+        // outline-offset: 0.25rem;
+        box-shadow: 0 0 0 3px var(--focus-color);
+      }
+    }
+
+    [data-type="agama/option"]:not(:last-child) {
+      border-inline-end: 2px solid var(--color-gray-darker);
+      padding-inline-end: var(--spacer-small);
+    }
+  }
+
+  > div[aria-expanded="false"] {
+    display: none;
+  }
+}
+
+table[data-type="agama/tree-table"] {
+  th:first-child {
+    block-size: fit-content;
+    padding-inline-end: var(--spacer-normal);
+  }
+
+  th.fit-content {
+    block-size: fit-content;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  /**
+   * Temporary PF/Table overrides for small devices
+   **/
+  @media (width <= 768px) {
+    &.pf-m-tree-view-grid-md.pf-v5-c-table tr[aria-level="1"] td {
+      padding-inline-start: var(--spacer-medium);
+    }
+
+    &.pf-m-tree-view-grid-md.pf-v5-c-table tr[aria-level="2"] th {
+      padding-inline-start: calc(var(--spacer-large) * 1.1);
+    }
+
+    &.pf-m-tree-view-grid-md.pf-v5-c-table tr[aria-level="2"] td {
+      padding-inline-start: calc(var(--spacer-large) * 1.4);
+    }
+
+    &.pf-m-tree-view-grid-md.pf-v5-c-table tr:where(.pf-v5-c-table__tr).pf-m-tree-view-details-expanded {
+      padding-block-end: var(--spacer-smaller);
+    }
+
+    &.pf-m-tree-view-grid-md.pf-v5-c-table tr:where(.pf-v5-c-table__tr) td:empty,
+    &.pf-m-tree-view-grid-md.pf-v5-c-table tr:where(.pf-v5-c-table__tr) td *:empty,
+    &.pf-m-tree-view-grid-md.pf-v5-c-table tr:where(.pf-v5-c-table__tr) td:has(> *:empty) {
+      display: none;
+    }
+
+    &.pf-m-tree-view-grid-md.pf-v5-c-table tr:where(.pf-v5-c-table__tr) td:has(> *:not(:empty)) {
+      display: inherit;
+    }
+
+    &.pf-m-tree-view-grid-md.pf-v5-c-table tbody:where(.pf-v5-c-table__tbody) tr:where(.pf-v5-c-table__tr)::before {
+      inset-inline-start: 0;
+    }
+
+    &.pf-v5-c-table.pf-m-compact tr:where(.pf-v5-c-table__tr):not(.pf-v5-c-table__expandable-row) > *:last-child {
+      padding-inline-end: 8px;
+    }
+
+    tbody th:first-child {
+      font-size: var(--fs-large);
+      padding-block-start: var(--spacer-small);
+    }
+  }
+}
+
+// FIXME: use a single selector
+table.devices-table,
+table.proposal-result {
+  tr.dimmed-row {
+    background-color: #fff;
+    opacity: 0.8;
+    background: repeating-linear-gradient( -45deg, #fcfcff, #fcfcff 3px, #fff 3px, #fff 10px );
+
+    td {
+      color: var(--color-gray-dimmed);
+      padding-block: 0;
+    }
+
+  }
+
+  /**
+   * Temporary hack because the collapse/expand callback was not given to the
+   * tree table
+   **/
+  th button {
+    display: none;
+  }
+
+  tbody th .pf-v5-c-table__tree-view-main {
+    padding-inline-start: var(--pf-v5-c-table--m-compact--cell--first-last-child--PaddingLeft);
+    cursor: auto;
+  }
+
+  tbody tr[aria-level="2"] th .pf-v5-c-table__tree-view-main {
+    padding-inline-start: calc(
+       var(--pf-v5-c-table--m-compact--cell--first-last-child--PaddingLeft) + var(--spacer-large)
+    );
+  }
+  /** End of temporary hack */
+
+  @media (width > 768px) {
+    th.details-column {
+      padding-inline-start: calc(60px + var(--spacer-smaller) * 2);
+    }
+
+    td.details-column {
+      display: grid;
+      gap: var(--spacer-smaller);
+      grid-template-columns: 60px 1fr;
+
+      :first-child {
+        text-align: end;
+      }
+    }
+
+    th.sizes-column,
+    td.sizes-column {
+      text-align: end;
+
+      div.split {
+        justify-content: flex-end;
+      }
     }
   }
 }
@@ -418,6 +627,70 @@ ul[data-of="agama/timezones"] {
   }
 }
 
+[data-type="agama/options-picker"] {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacer-smaller);
+
+  [role="option"] {
+    cursor: pointer;
+    border: 1px solid var(--color-gray);
+    padding: var(--spacer-small);
+    border-block-end-width: 4px;
+
+    &[aria-selected="true"] {
+      background: var(--color-gray-light);
+      border-color: var(--color-primary);
+    }
+
+    >:first-child {
+      margin-block-end: var(--spacer-small);
+    }
+
+    >:last-child {
+      font-size: var(--fs-small);
+    }
+  }
+}
+
+[data-type="agama/reminder"] {
+  --accent-color: var(--color-primary-lighter);
+  --inline-margin: calc(var(--header-icon-size) + var(--spacer-small));
+
+  display: flex;
+  gap: var(--spacer-small);
+  margin-inline: var(--inline-margin);
+  margin-block-end: var(--spacer-normal);
+  padding: var(--spacer-smaller) var(--spacer-small);
+  border-inline-start: 3px solid var(--accent-color);
+
+  svg {
+    fill: var(--accent-color);
+  }
+
+  h4 {
+    color: var(--accent-color);
+  }
+
+  h4 ~ * {
+    margin-block-start: var(--spacer-small);
+  }
+}
+
+section [data-type="agama/reminder"] {
+  margin-inline: 0;
+}
+
+[data-type="agama/reminder"][data-variant="subtle"] {
+  --accent-color: var(--color-primary);
+  padding-block: 0;
+  border-inline-start-width: 1px;
+
+  h4 {
+    font-size: var(--fs-normal);
+  }
+}
+
 [role="dialog"] {
   section:not([class^="pf-c"]) {
     > svg:first-child {
@@ -442,5 +715,38 @@ ul[data-of="agama/timezones"] {
 
   .pf-v5-c-alert__description {
     max-inline-size: 100%;
+  }
+}
+
+
+[data-type="agama/expandable-selector"] {
+  // The expandable selector is built on top of PF/Table#expandable
+  // Let's tweak some styles
+  tr {
+    td:first-child {
+      padding-inline-start: 0;
+    }
+
+    td:last-child {
+      padding-inline-end: 0;
+    }
+  }
+
+  tr.pf-v5-c-table__expandable-row.pf-m-expanded {
+    border-bottom: 0;
+
+    .pf-v5-c-table__expandable-row-content {
+      font-size: var(--fs-medium);
+      padding-block: var(--spacer-small);
+    }
+  }
+}
+
+#boot-form {
+  legend {
+    label {
+      font-size: var(--fs-large);
+      font-weight: bold;
+    }
   }
 }
