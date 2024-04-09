@@ -1,5 +1,5 @@
 /*
- * Copyright (c) [2022-2023] SUSE LLC
+ * Copyright (c) [2022-2024] SUSE LLC
  *
  * All Rights Reserved.
  *
@@ -82,6 +82,41 @@ const volumes = {
       snapshotsAffectSizes: false,
       sizeRelevantVolumes: []
     }
+  }
+};
+
+const sda = {
+  sid: 59,
+  name: "/dev/sda",
+  isDrive: true,
+  type: "disk",
+  vendor: "Micron",
+  model: "Micron 1100 SATA",
+  transport: "usb",
+  size: 1024
+};
+
+const sda1 = {
+  sid: 69,
+  name: "/dev/sda1",
+  isDrive: false,
+  type: "partition",
+  size: 256,
+  filesystem: {
+    sid: 169,
+    type: "Swap"
+  }
+};
+
+const sda2 = {
+  sid: 79,
+  name: "/dev/sda2",
+  isDrive: false,
+  type: "partition",
+  size: 512,
+  filesystem: {
+    sid: 179,
+    type: "Ext4"
   }
 };
 
@@ -181,9 +216,9 @@ describe("if there are volumes", () => {
     const [, body] = await screen.findAllByRole("rowgroup");
 
     expect(within(body).queryAllByRole("row").length).toEqual(3);
-    within(body).getByRole("row", { name: "/ Btrfs partition 1 KiB - 2 KiB" });
-    within(body).getByRole("row", { name: "/home XFS partition At least 1 KiB" });
-    within(body).getByRole("row", { name: "swap Swap partition 1 KiB" });
+    within(body).getByRole("row", { name: "/ Btrfs 1 KiB - 2 KiB Partition at installation disk" });
+    within(body).getByRole("row", { name: "/home XFS At least 1 KiB Partition at installation disk" });
+    within(body).getByRole("row", { name: "swap Swap 1 KiB Partition at installation disk" });
   });
 
   it("allows deleting the volume", async () => {
@@ -192,7 +227,7 @@ describe("if there are volumes", () => {
     const { user } = plainRender(<ProposalVolumes {...props} />);
 
     const [, body] = await screen.findAllByRole("rowgroup");
-    const row = within(body).getByRole("row", { name: "/home XFS partition At least 1 KiB" });
+    const row = within(body).getByRole("row", { name: "/home XFS At least 1 KiB Partition at installation disk" });
     const actions = within(row).getByRole("button", { name: "Actions" });
     await user.click(actions);
     const deleteAction = within(row).queryByRole("menuitem", { name: "Delete" });
@@ -207,7 +242,7 @@ describe("if there are volumes", () => {
     const { user } = plainRender(<ProposalVolumes {...props} />);
 
     const [, body] = await screen.findAllByRole("rowgroup");
-    const row = within(body).getByRole("row", { name: "/home XFS partition At least 1 KiB" });
+    const row = within(body).getByRole("row", { name: "/home XFS At least 1 KiB Partition at installation disk" });
     const actions = within(row).getByRole("button", { name: "Actions" });
     await user.click(actions);
     const editAction = within(row).queryByRole("menuitem", { name: "Edit" });
@@ -217,9 +252,9 @@ describe("if there are volumes", () => {
     within(popup).getByText("Edit file system");
   });
 
-  describe("and there is transactional Btrfs volume", () => {
+  describe("and there is transactional Btrfs root volume", () => {
     beforeEach(() => {
-      props.volumes = [{ ...volumes.root, transactional: true }];
+      props.volumes = [{ ...volumes.root, snapshots: true, transactional: true }];
     });
 
     it("renders 'transactional' legend as part of its information", async () => {
@@ -227,13 +262,13 @@ describe("if there are volumes", () => {
 
       const [, volumes] = await screen.findAllByRole("rowgroup");
 
-      within(volumes).getByRole("row", { name: "/ Btrfs partition transactional 1 KiB - 2 KiB" });
+      within(volumes).getByRole("row", { name: "/ Transactional Btrfs 1 KiB - 2 KiB Partition at installation disk" });
     });
   });
 
   describe("and there is Btrfs volume using snapshots", () => {
     beforeEach(() => {
-      props.volumes = [{ ...volumes.root, snapshots: true }];
+      props.volumes = [{ ...volumes.root, snapshots: true, transactional: false }];
     });
 
     it("renders 'with snapshots' legend as part of its information", async () => {
@@ -241,21 +276,45 @@ describe("if there are volumes", () => {
 
       const [, volumes] = await screen.findAllByRole("rowgroup");
 
-      within(volumes).getByRole("row", { name: "/ Btrfs partition with snapshots 1 KiB - 2 KiB" });
+      within(volumes).getByRole("row", { name: "/ Btrfs with snapshots 1 KiB - 2 KiB Partition at installation disk" });
     });
   });
 
-  describe("and there is a transactional Btrfs volume using snapshots", () => {
+  describe("and some volumes are allocated at separate disks", () => {
     beforeEach(() => {
-      props.volumes = [{ ...volumes.root, transactional: true, snapshots: true }];
+      props.volumes = [
+        volumes.root,
+        { ...volumes.swap, target: "new_partition", targetDevice: sda },
+        { ...volumes.home, target: "new_vg", targetDevice: sda }
+      ];
     });
 
-    it("renders 'with snapshots' and 'transactional' legends as part of its information", async () => {
+    it("renders the locations", async () => {
       plainRender(<ProposalVolumes {...props} />);
 
       const [, volumes] = await screen.findAllByRole("rowgroup");
 
-      within(volumes).getByRole("row", { name: "/ Btrfs partition with snapshots transactional 1 KiB - 2 KiB" });
+      within(volumes).getByRole("row", { name: "swap Swap 1 KiB Partition at /dev/sda" });
+      within(volumes).getByRole("row", { name: "/home XFS At least 1 KiB Separate LVM at /dev/sda" });
+    });
+  });
+
+  describe("and some volumes are reusing existing block devices", () => {
+    beforeEach(() => {
+      props.volumes = [
+        volumes.root,
+        { ...volumes.swap, target: "filesystem", targetDevice: sda1 },
+        { ...volumes.home, target: "device", targetDevice: sda2 }
+      ];
+    });
+
+    it("renders the locations", async () => {
+      plainRender(<ProposalVolumes {...props} />);
+
+      const [, volumes] = await screen.findAllByRole("rowgroup");
+
+      within(volumes).getByRole("row", { name: "swap Reused Swap 256 B /dev/sda1" });
+      within(volumes).getByRole("row", { name: "/home XFS 512 B /dev/sda2" });
     });
   });
 });

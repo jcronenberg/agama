@@ -1,5 +1,5 @@
 /*
- * Copyright (c) [2022-2023] SUSE LLC
+ * Copyright (c) [2022-2024] SUSE LLC
  *
  * All Rights Reserved.
  *
@@ -20,6 +20,25 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from "react";
+
+/**
+ * Returns true when given value is an
+ * {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object Object}
+ *
+ * Borrowed from https://dev.to/alesm0101/how-to-check-if-a-value-is-an-object-in-javascript-3pin
+ *
+ * @param {any} value - the value to be checked
+ * @return {boolean} true when given value is an object; false otherwise
+ */
+const isObject = (value) => (
+  typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !(value instanceof RegExp) &&
+    !(value instanceof Date) &&
+    !(value instanceof Set) &&
+    !(value instanceof Map)
+);
 
 /**
  * Returns an empty function useful to be used as a default callback.
@@ -46,6 +65,28 @@ const partition = (collection, filter) => {
 
   return [pass, fail];
 };
+
+/**
+ * Generates a new array without null and undefined values.
+ * @function
+ *
+ * @param {Array} collection
+ * @returns {Array}
+ */
+function compact(collection) {
+  return collection.filter(e => e !== null && e !== undefined);
+}
+
+/**
+ * Generates a new array without duplicates.
+ * @function
+ *
+ * @param {Array} collection
+ * @returns {Array}
+ */
+function uniq(collection) {
+  return [...new Set(collection)];
+}
 
 /**
  * Simple utility function to help building className conditionally
@@ -334,7 +375,10 @@ const timezoneUTCOffset = (timezone) => {
 
 export {
   noop,
+  isObject,
   partition,
+  compact,
+  uniq,
   classNames,
   useCancellablePromise,
   useLocalStorage,

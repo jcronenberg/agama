@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 agama-settings = { path="../agama-settings" }
 anyhow = "1.0"
+async-trait = "0.1.77"
 cidr = { version = "0.2.2", features = ["serde"] }
 curl = { version = "0.4.44", features = ["protocol-ftp"] }
 futures-util = "0.3.29"
@@ -19,4 +20,6 @@ tempfile = "3.4.0"
 thiserror = "1.0.39"
 tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread"] }
 tokio-stream = "0.1.14"
+url = "2.5.0"
+utoipa = "4.2.0"
 zbus = { version = "3", default-features = false, features = ["tokio"] }

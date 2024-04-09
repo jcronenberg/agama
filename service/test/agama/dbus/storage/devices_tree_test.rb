@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Copyright (c) [2023] SUSE LLC
+# Copyright (c) [2023-2024] SUSE LLC
 #
 # All Rights Reserved.
 #
@@ -22,8 +22,8 @@
 require_relative "../../../test_helper"
 require_relative "../../storage/storage_helpers"
 require "agama/dbus/storage/devices_tree"
-require "y2storage"
 require "dbus"
+require "y2storage"
 
 describe Agama::DBus::Storage::DevicesTree do
   include Agama::RSpec::StorageHelpers
@@ -37,6 +37,16 @@ describe Agama::DBus::Storage::DevicesTree do
 
     failure_message do |_|
       "The object #{object_path} is not exported."
+    end
+
+    match_when_negated do |service|
+      expect(service).to receive(:export) do |dbus_object|
+        expect(dbus_object.path).to_not eq(object_path)
+      end
+    end
+
+    failure_message_when_negated do |_|
+      "The object #{object_path} is exported."
     end
   end
 
@@ -77,43 +87,67 @@ describe Agama::DBus::Storage::DevicesTree do
       mock_storage(devicegraph: scenario)
 
       allow(service).to receive(:get_node).with(root_path, anything).and_return(root_node)
+      # Returning an empty list for the second call to mock the effect of calling to #clear.
+      allow(root_node).to receive(:descendant_objects).and_return(dbus_objects, [])
+
       allow(service).to receive(:export)
       allow(service).to receive(:unexport)
 
-      allow(root_node).to receive(:descendant_objects).and_return(dbus_objects)
+      allow_any_instance_of(::DBus::Object).to receive(:interfaces_and_properties).and_return({})
+      allow_any_instance_of(::DBus::Object).to receive(:dbus_properties_changed)
     end
 
     let(:scenario) { "partitioned_md.yml" }
 
     let(:root_node) { instance_double(::DBus::Node) }
 
-    let(:dbus_objects) do
-      [
-        instance_double(Agama::DBus::Storage::Device, path: "#{root_path}/1001"),
-        instance_double(Agama::DBus::Storage::Device, path: "#{root_path}/1002")
-      ]
-    end
-
     let(:devicegraph) { Y2Storage::StorageManager.instance.probed }
 
-    it "unexports the current objects" do
-      expect(service).to unexport_object("#{root_path}/1001")
-      expect(service).to unexport_object("#{root_path}/1002")
+    let(:dbus_objects) { [dbus_object1, dbus_object2] }
+    let(:dbus_object1) { Agama::DBus::Storage::Device.new(sda, subject.path_for(sda), subject) }
+    let(:dbus_object2) { Agama::DBus::Storage::Device.new(sdb, subject.path_for(sdb), subject) }
+    let(:sda) { devicegraph.find_by_name("/dev/sda") }
+    let(:sdb) { devicegraph.find_by_name("/dev/sdb") }
+
+    it "unexports the current D-Bus objects" do
+      expect(service).to unexport_object("#{root_path}/#{sda.sid}")
+      expect(service).to unexport_object("#{root_path}/#{sdb.sid}")
 
       subject.update(devicegraph)
     end
 
-    it "exports an object for each storage device" do
-      sda = devicegraph.find_by_name("/dev/sda")
-      sdb = devicegraph.find_by_name("/dev/sdb")
+    it "exports disk devices and partitions" do
       md0 = devicegraph.find_by_name("/dev/md0")
+      sda1 = devicegraph.find_by_name("/dev/sda1")
+      sda2 = devicegraph.find_by_name("/dev/sda2")
+      md0p1 = devicegraph.find_by_name("/dev/md0p1")
 
       expect(service).to export_object("#{root_path}/#{sda.sid}")
       expect(service).to export_object("#{root_path}/#{sdb.sid}")
       expect(service).to export_object("#{root_path}/#{md0.sid}")
+      expect(service).to export_object("#{root_path}/#{sda1.sid}")
+      expect(service).to export_object("#{root_path}/#{sda2.sid}")
+      expect(service).to export_object("#{root_path}/#{md0p1.sid}")
       expect(service).to_not receive(:export)
 
       subject.update(devicegraph)
+    end
+
+    context "if there are LVM volume groups" do
+      let(:scenario) { "trivial_lvm.yml" }
+
+      let(:dbus_objects) { [] }
+
+      it "exports the LVM volume groups and the logical volumes" do
+        vg0 = devicegraph.find_by_name("/dev/vg0")
+        lv1 = devicegraph.find_by_name("/dev/vg0/lv1")
+
+        expect(service).to receive(:export)
+        expect(service).to export_object("#{root_path}/#{vg0.sid}")
+        expect(service).to export_object("#{root_path}/#{lv1.sid}")
+
+        subject.update(devicegraph)
+      end
     end
   end
 end
