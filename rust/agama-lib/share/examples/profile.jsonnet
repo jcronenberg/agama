@@ -3,14 +3,13 @@
 // For the schema, see
 // https://github.com/openSUSE/agama/blob/master/rust/agama-lib/share/profile.schema.json
 
-// The "hw.libsonnet" file contains hardware information of the storage devices
-// from the "lshw" tool. Agama generates this file at runtime by running (with
-// root privileges):
+// The "hw.libsonnet" file contains hardware information from the "lshw" tool.
+// Agama generates this file at runtime by running (with root privileges):
 //
-//   lshw -json -class disk
+//   lshw -json
 //
-// However, it is expected to change in the near future to include information
-// from other subsystems (e.g., network).
+// There are included also helpers to search this hardware tree. To see helpers check
+// "/usr/share/agama-cli/agama.libsonnet"
 local agama = import 'hw.libsonnet';
 
 // Find the biggest disk which is suitable for installing the system.
@@ -19,9 +18,17 @@ local findBiggestDisk(disks) =
   local sorted = std.sort(sizedDisks, function(x) -x.size);
   sorted[0].logicalname;
 
+// Find how much physical memory system has.
+local memory = agama.findByID(agama.lshw, 'memory').size;
+
 {
+  product: {
+    id: if memory < 8000000000 then 'MicroOS' else 'Tumbleweed',
+  },
   software: {
-    product: 'ALP-Bedrock',
+    patterns: [
+      'gnome'
+    ],
   },
   user: {
     fullName: 'Jane Doe',
@@ -35,10 +42,10 @@ local findBiggestDisk(disks) =
   // look ma, there are comments!
   localization: {
     language: 'en_US',
-    keyboard: 'en_US',
+    keyboard: 'us',
   },
   storage: {
-    bootDevice: findBiggestDisk(agama.disks),
+    bootDevice: findBiggestDisk(agama.selectByClass(agama.lshw, 'disk')),
   },
   network: {
     connections: [
@@ -56,7 +63,7 @@ local findBiggestDisk(disks) =
         method4: 'manual',
         gateway4: '192.168.122.1',
         addresses: [
-          '192.168.122.100/24,'
+          '192.168.122.100/24'
         ],
         nameservers: [
           '1.2.3.4'

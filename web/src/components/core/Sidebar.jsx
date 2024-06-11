@@ -24,12 +24,7 @@ import { Icon } from "~/components/layout";
 import { InstallerKeymapSwitcher, InstallerLocaleSwitcher } from "~/components/l10n";
 import {
   About,
-  DevelopmentInfo,
-  Disclosure,
-  // FIXME: unify names here by renaming LogsButton -> LogButton or ShowLogButton -> ShowLogsButton
   LogsButton,
-  ShowLogButton,
-  ShowTerminalButton,
 } from "~/components/core";
 import { noop } from "~/utils";
 import { _ } from "~/i18n";
@@ -41,10 +36,14 @@ import useNodeSiblings from "~/hooks/useNodeSiblings";
  *
  * A component intended for placing things exclusively related to Agama.
  *
- * @param {object} props
- * @param {React.ReactElement} props.children
+ * @typedef {object} SidebarProps
+ * @property {boolean} [isOpen] - Whether the sidebar is open or not.
+ * @property {() => void} [onClose] - A callback to be called when sidebar is closed.
+ * @property {React.ReactNode} [props.children]
+ *
+ * @param {SidebarProps}
  */
-export default function Sidebar ({ children, isOpen, onClose = noop }) {
+export default function Sidebar({ isOpen, onClose = noop, children }) {
   const asideRef = useRef(null);
   const closeButtonRef = useRef(null);
   const [addAttribute, removeAttribute] = useNodeSiblings(asideRef.current);
@@ -133,11 +132,7 @@ export default function Sidebar ({ children, isOpen, onClose = noop }) {
 
       <div className="flex-stack justify-between" onClick={onClick}>
         <div className="flex-stack">
-          <Disclosure label={_("Diagnostic tools")} data-keep-sidebar-open>
-            <ShowLogButton />
-            <LogsButton data-keep-sidebar-open="true" />
-            <ShowTerminalButton />
-          </Disclosure>
+          <LogsButton data-keep-sidebar-open="true" />
           {children}
           <About />
         </div>
@@ -157,7 +152,6 @@ export default function Sidebar ({ children, isOpen, onClose = noop }) {
           {_("Close")}
           <Icon name="menu_open" size="xxs" data-variant="flip-X" />
         </a>
-        <DevelopmentInfo />
       </footer>
     </aside>
   );

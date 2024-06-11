@@ -58,7 +58,8 @@ const rootVolume = {
     snapshotsConfigurable: true,
     snapshotsAffectSizes: true,
     sizeRelevantVolumes: [],
-    adjustByRam: false
+    adjustByRam: false,
+    productDefined: true
   }
 };
 
@@ -79,7 +80,8 @@ const swapVolume = {
     snapshotsConfigurable: false,
     snapshotsAffectSizes: false,
     sizeRelevantVolumes: [],
-    adjustByRam: false
+    adjustByRam: false,
+    productDefined: true
   }
 };
 
@@ -99,7 +101,30 @@ const homeVolume = {
     snapshotsConfigurable: false,
     snapshotsAffectSizes: false,
     sizeRelevantVolumes: [],
-    adjustByRam: false
+    adjustByRam: false,
+    productDefined: true
+  }
+};
+
+/** @type {Volume} */
+const arbitraryVolume = {
+  mountPath: "",
+  target: "DEFAULT",
+  fsType: "XFS",
+  minSize: 1024,
+  maxSize: 4096,
+  autoSize: false,
+  snapshots: false,
+  transactional: false,
+  outline: {
+    required: false,
+    fsTypes: ["Ext4", "XFS"],
+    supportAutoSize: false,
+    snapshotsConfigurable: false,
+    snapshotsAffectSizes: false,
+    adjustByRam: false,
+    sizeRelevantVolumes: [],
+    productDefined: false
   }
 };
 
@@ -158,9 +183,10 @@ beforeEach(() => {
   props = {
     volumes: [rootVolume, swapVolume],
     templates: [],
-    devices: [],
+    availableDevices: [],
+    volumeDevices: [sda],
     target: "DISK",
-    targetDevice: undefined,
+    targetDevices: [],
     configureBoot: false,
     bootDevice: undefined,
     defaultBootDevice: undefined,
@@ -168,8 +194,6 @@ beforeEach(() => {
     onBootChange: jest.fn()
   };
 });
-
-/** @todo Add tests for collapsed field. */
 
 it("allows to reset the file systems", async () => {
   const { user } = await expandField();
@@ -179,15 +203,61 @@ it("allows to reset the file systems", async () => {
   expect(props.onVolumesChange).toHaveBeenCalledWith([]);
 });
 
+it("renders a button for adding a file system when only arbitrary volumes can be added", async () => {
+  props.templates = [arbitraryVolume];
+  const { user } = await expandField();
+  const button = screen.getByRole("button", { name: "Add file system" });
+  expect(button).not.toHaveAttribute("aria-expanded");
+  await user.click(button);
+  screen.getByRole("dialog", { name: "Add file system" });
+});
+
+it("renders a menu for adding a file system when predefined and arbitrary volume can be added", async () => {
+  props.templates = [homeVolume, arbitraryVolume];
+  const { user } = await expandField();
+
+  const button = screen.getByRole("button", { name: "Add file system" });
+  expect(button).toHaveAttribute("aria-expanded", "false");
+  await user.click(button);
+
+  expect(button).toHaveAttribute("aria-expanded", "true");
+  const homeOption = screen.getByRole("menuitem", { name: "/home" });
+  await user.click(homeOption);
+
+  screen.getByRole("dialog", { name: "Add /home file system" });
+});
+
+it("renders the control for adding a file system when using transactional system with optional templates", async () => {
+  props.templates = [{ ...rootVolume, transactional: true }, homeVolume];
+  await expandField();
+  screen.queryByRole("button", { name: "Add file system" });
+});
+
+it("does not render the control for adding a file system when using transactional system with no optional templates", async () => {
+  props.templates = [{ ...rootVolume, transactional: true }];
+  await expandField();
+  expect(screen.queryByRole("button", { name: "Add file system" })).toBeNull();
+});
+
+it("renders the control as disabled when there are no more left predefined volumes to add and arbitrary volumes are not allowed", async () => {
+  props.templates = [rootVolume, homeVolume];
+  props.volumes = [rootVolume, homeVolume];
+  await expandField();
+  const button = screen.getByRole("button", { name: "Add file system" });
+  expect(button).toBeDisabled();
+});
+
 it("allows to add a file system", async () => {
   props.templates = [homeVolume];
   const { user } = await expandField();
 
   const button = screen.getByRole("button", { name: "Add file system" });
   await user.click(button);
+  const homeOption = screen.getByRole("menuitem", { name: "/home" });
+  await user.click(homeOption);
 
-  const popup = await screen.findByRole("dialog");
-  const accept = within(popup).getByRole("button", { name: "Accept" });
+  const dialog = await screen.findByRole("dialog");
+  const accept = within(dialog).getByRole("button", { name: "Accept" });
   await user.click(accept);
 
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -195,7 +265,7 @@ it("allows to add a file system", async () => {
 });
 
 it("allows to cancel adding a file system", async () => {
-  props.templates = [homeVolume];
+  props.templates = [arbitraryVolume];
   const { user } = await expandField();
 
   const button = screen.getByRole("button", { name: "Add file system" });
@@ -262,7 +332,7 @@ describe("if there are volumes", () => {
     await user.click(editAction);
 
     const popup = await screen.findByRole("dialog");
-    within(popup).getByText("Edit file system");
+    within(popup).getByRole("heading", { name: "Edit /home file system" });
   });
 
   it("allows changing the location of the volume", async () => {
@@ -277,6 +347,44 @@ describe("if there are volumes", () => {
 
     const popup = await screen.findByRole("dialog");
     within(popup).getByText("Location for /home file system");
+  });
+
+  // FIXME: improve at least the test description
+  it("does not allow resetting the volume location when already using the default location", async () => {
+    const { user } = await expandField();
+
+    const [, body] = await screen.findAllByRole("rowgroup");
+    const row = within(body).getByRole("row", { name: "/home XFS at least 1 KiB Partition at installation disk" });
+    const actions = within(row).getByRole("button", { name: "Actions" });
+    await user.click(actions);
+    expect(within(row).queryByRole("menuitem", { name: "Reset location" })).toBeNull();
+  });
+
+  describe("and a volume has a non default location", () => {
+    beforeEach(() => {
+      props.volumes = [{ ...homeVolume, target: "NEW_PARTITION", targetDevice: sda }];
+    });
+
+    it("allows resetting the volume location", async () => {
+      const { user } = await expandField();
+
+      const [, body] = await screen.findAllByRole("rowgroup");
+      const row = within(body).getByRole("row", { name: "/home XFS at least 1 KiB Partition at /dev/sda" });
+      const actions = within(row).getByRole("button", { name: "Actions" });
+      await user.click(actions);
+      const resetLocationAction = within(row).queryByRole("menuitem", { name: "Reset location" });
+      await user.click(resetLocationAction);
+      expect(props.onVolumesChange).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ mountPath: "/home", target: "DEFAULT", targetDevice: undefined })
+        ])
+      );
+
+      // NOTE: sadly we cannot perform the below check because the component is
+      // always receiving the same mocked props and will still having a /home as
+      // "Partition at /dev/sda"
+      // await within(body).findByRole("row", { name: "/home XFS at least 1 KiB Partition at installation device" });
+    });
   });
 
   describe("and there is a transactional Btrfs root volume", () => {

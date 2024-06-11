@@ -89,7 +89,9 @@ module Agama
 
           dbus_method(:AddPattern, "in id:s, out result:b") { |p| backend.add_pattern(p) }
           dbus_method(:RemovePattern, "in id:s, out result:b") { |p| backend.remove_pattern(p) }
-          dbus_method(:SetUserPatterns, "in ids:as, out wrong:as") { |ids| [backend.assign_patterns(ids)] }
+          dbus_method(:SetUserPatterns, "in add:as, in remove:as, out wrong:as") do |add, remove|
+            [backend.assign_patterns(add, remove)]
+          end
 
           dbus_method :ProvisionsSelected, "in Provisions:as, out Result:ab" do |provisions|
             [provisions.map { |p| backend.provision_selected?(p) }]
@@ -105,6 +107,8 @@ module Agama
 
           dbus_method(:UsedDiskSpace, "out SpaceSize:s") { backend.used_disk_space }
 
+          dbus_signal(:ProbeFinished)
+
           dbus_method(:Probe) { probe }
           dbus_method(:Propose) { propose }
           dbus_method(:Install) { install }
@@ -113,6 +117,7 @@ module Agama
 
         def probe
           busy_while { backend.probe }
+          self.ProbeFinished
         end
 
         def propose

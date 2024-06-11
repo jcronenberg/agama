@@ -29,13 +29,14 @@ jest.mock("~/client");
 
 const l10nClientMock = {
   getUILocale: jest.fn().mockResolvedValue("en_US"),
+  getUIKeymap: jest.fn().mockResolvedValue("en"),
   keymaps: jest.fn().mockResolvedValue([]),
   getKeymap: jest.fn().mockResolvedValue(undefined),
   timezones: jest.fn().mockResolvedValue([]),
   getTimezone: jest.fn().mockResolvedValue(undefined),
   onLocalesChange: jest.fn(),
   onKeymapChange: jest.fn(),
-  onTimezoneChange: jest.fn()
+  onTimezoneChange: jest.fn(),
 };
 
 describe("Page", () => {
@@ -143,13 +144,21 @@ describe("Page", () => {
     screen.getByRole("button", { name: "Back" });
   });
 
-  it("renders the Agama sidebar", async () => {
+  it("renders the Agama sidebar by default", async () => {
     const { user } = installerRender(<Page />, { withL10n: true });
-
     const openSidebarButton = screen.getByRole("button", { name: "Show global options" });
 
     await user.click(openSidebarButton);
+
     screen.getByRole("complementary", { name: /options/i });
+  });
+
+  it("does not render the Agama sidebar when mountSidebar=false", () => {
+    installerRender(<Page mountSidebar={false} />, { withL10n: true });
+    const openSidebarButton = screen.queryByRole("button", { name: "Show global options" });
+    const sidebar = screen.queryByRole("complementary", { name: /options/i, hidden: true });
+    expect(openSidebarButton).toBeNull();
+    expect(sidebar).toBeNull();
   });
 });
 

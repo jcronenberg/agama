@@ -35,7 +35,10 @@ import { IDLE } from "~/client/status";
 
 const initialState = {
   loading: true,
+  // which UI item is being changed by user
+  changing: undefined,
   availableDevices: [],
+  volumeDevices: [],
   volumeTemplates: [],
   encryptionMethods: [],
   settings: {},
@@ -52,12 +55,18 @@ const reducer = (state, action) => {
     }
 
     case "STOP_LOADING" : {
-      return { ...state, loading: false };
+      // reset the changing value after the refresh is finished
+      return { ...state, loading: false, changing: undefined };
     }
 
     case "UPDATE_AVAILABLE_DEVICES": {
       const { availableDevices } = action.payload;
       return { ...state, availableDevices };
+    }
+
+    case "UPDATE_VOLUME_DEVICES": {
+      const { volumeDevices } = action.payload;
+      return { ...state, volumeDevices };
     }
 
     case "UPDATE_ENCRYPTION_METHODS": {
@@ -76,8 +85,8 @@ const reducer = (state, action) => {
     }
 
     case "UPDATE_SETTINGS": {
-      const { settings } = action.payload;
-      return { ...state, settings };
+      const { settings, changing } = action.payload;
+      return { ...state, settings, changing };
     }
 
     case "UPDATE_DEVICES": {
@@ -96,6 +105,30 @@ const reducer = (state, action) => {
   }
 };
 
+/**
+ * Which UI item is being changed by user
+ */
+export const CHANGING = Object.freeze({
+  ENCRYPTION: Symbol("encryption"),
+  TARGET: Symbol("target"),
+  VOLUMES: Symbol("volumes"),
+  POLICY: Symbol("policy"),
+  BOOT: Symbol("boot"),
+});
+
+// mapping of not affected values for settings components
+// key:   component name
+// value: list of items which can be changed without affecting
+//        the state of the component
+export const NOT_AFFECTED = {
+  // the EncryptionField shows the skeleton only during initial load,
+  // it does not depend on any changed item and does not show skeleton later.
+  // the ProposalResultSection is refreshed always
+  InstallationDeviceField: [CHANGING.ENCRYPTION, CHANGING.BOOT, CHANGING.POLICY, CHANGING.VOLUMES],
+  PartitionsField: [CHANGING.ENCRYPTION, CHANGING.POLICY],
+  SpacePolicyField: [CHANGING.ENCRYPTION, CHANGING.TARGET],
+};
+
 export default function ProposalPage() {
   const { storage: client } = useInstallerClient();
   const { cancellablePromise } = useCancellablePromise();
@@ -103,6 +136,10 @@ export default function ProposalPage() {
 
   const loadAvailableDevices = useCallback(async () => {
     return await cancellablePromise(client.proposal.getAvailableDevices());
+  }, [client, cancellablePromise]);
+
+  const loadVolumeDevices = useCallback(async () => {
+    return await cancellablePromise(client.proposal.getVolumeDevices());
   }, [client, cancellablePromise]);
 
   const loadEncryptionMethods = useCallback(async () => {
@@ -153,6 +190,9 @@ export default function ProposalPage() {
     const availableDevices = await loadAvailableDevices();
     dispatch({ type: "UPDATE_AVAILABLE_DEVICES", payload: { availableDevices } });
 
+    const volumeDevices = await loadVolumeDevices();
+    dispatch({ type: "UPDATE_VOLUME_DEVICES", payload: { volumeDevices } });
+
     const encryptionMethods = await loadEncryptionMethods();
     dispatch({ type: "UPDATE_ENCRYPTION_METHODS", payload: { encryptionMethods } });
 
@@ -169,7 +209,7 @@ export default function ProposalPage() {
     dispatch({ type: "UPDATE_ERRORS", payload: { errors } });
 
     if (result !== undefined) dispatch({ type: "STOP_LOADING" });
-  }, [calculateProposal, cancellablePromise, client, loadAvailableDevices, loadDevices, loadEncryptionMethods, loadErrors, loadProposalResult, loadVolumeTemplates]);
+  }, [calculateProposal, cancellablePromise, client, loadAvailableDevices, loadVolumeDevices, loadDevices, loadEncryptionMethods, loadErrors, loadProposalResult, loadVolumeTemplates]);
 
   const calculate = useCallback(async (settings) => {
     dispatch({ type: "START_LOADING" });
@@ -208,10 +248,10 @@ export default function ProposalPage() {
     }
   }, [client, load, state.settings]);
 
-  const changeSettings = async (settings) => {
+  const changeSettings = async (changing, settings) => {
     const newSettings = { ...state.settings, ...settings };
 
-    dispatch({ type: "UPDATE_SETTINGS", payload: { settings: newSettings } });
+    dispatch({ type: "UPDATE_SETTINGS", payload: { settings: newSettings, changing } });
     calculate(newSettings).catch(console.error);
   };
 
@@ -231,11 +271,13 @@ export default function ProposalPage() {
       />
       <ProposalSettingsSection
         availableDevices={state.availableDevices}
+        volumeDevices={state.volumeDevices}
         encryptionMethods={state.encryptionMethods}
         volumeTemplates={state.volumeTemplates}
         settings={state.settings}
         onChange={changeSettings}
         isLoading={state.loading}
+        changing={state.changing}
       />
       <ProposalResultSection
         system={state.system}

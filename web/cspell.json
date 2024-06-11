@@ -6,7 +6,6 @@
     "src/languages.json",
     "src/lib/cockpit.js",
     "src/lib/cockpit-po-plugin.js",
-    "src/manifest.json",
     "src/**/test-data/*"
   ],
   "import": [
@@ -71,6 +70,7 @@
         "subvolume",
         "subvolumes",
         "svgrrc",
+        "scrollbox",
         "teleporter",
         "testfile",
         "testsuite",

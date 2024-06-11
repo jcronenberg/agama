@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-04-07 02:10+0000\n"
-"PO-Revision-Date: 2024-03-05 02:05+0000\n"
+"POT-Creation-Date: 2024-06-09 02:25+0000\n"
+"PO-Revision-Date: 2024-04-19 23:43+0000\n"
 "Last-Translator: faila fail <yassadmi@proton.me>\n"
 "Language-Team: French <https://l10n.opensuse.org/projects/agama/agama-"
 "service-master/fr/>\n"
@@ -127,7 +127,7 @@ msgstr "Restauration des dépôts d'origine"
 #. Repositories that could not be probed are reported as errors.
 #.
 #. @return [Array<Agama::Issue>]
-#: service/lib/agama/software/manager.rb:470
+#: service/lib/agama/software/manager.rb:482
 #, c-format
 msgid "Could not read repository \"%s\""
 msgstr "Impossible de lire le dépôt \"%s\""
@@ -135,14 +135,14 @@ msgstr "Impossible de lire le dépôt \"%s\""
 #. Issue when a product is missing
 #.
 #. @return [Agama::Issue]
-#: service/lib/agama/software/manager.rb:480
+#: service/lib/agama/software/manager.rb:492
 msgid "Product not selected yet"
 msgstr "Le produit n'est pas encore sélectionné"
 
 #. Issue when a product requires registration but it is not registered yet.
 #.
 #. @return [Agama::Issue]
-#: service/lib/agama/software/manager.rb:489
+#: service/lib/agama/software/manager.rb:501
 msgid "Product must be registered"
 msgstr "Le produit doit être enregistré"
 
@@ -155,61 +155,73 @@ msgid "Found %s dependency issues."
 msgstr "%s problème(s) de dépendance trouvé(s)."
 
 #. Probes storage devices and performs an initial proposal
-#: service/lib/agama/storage/manager.rb:112
+#: service/lib/agama/storage/manager.rb:113
 msgid "Activating storage devices"
 msgstr "Activation des périphériques de stockage"
 
-#: service/lib/agama/storage/manager.rb:113
+#: service/lib/agama/storage/manager.rb:114
 msgid "Probing storage devices"
 msgstr "Sonde les périphériques de stockage"
 
-#: service/lib/agama/storage/manager.rb:114
+#: service/lib/agama/storage/manager.rb:115
 msgid "Calculating the storage proposal"
 msgstr "Calcul de la proposition de stockage"
 
-#: service/lib/agama/storage/manager.rb:115
+#: service/lib/agama/storage/manager.rb:116
 msgid "Selecting Linux Security Modules"
 msgstr "Sélection des modules de sécurité Linux"
 
 #. Prepares the partitioning to install the system
-#: service/lib/agama/storage/manager.rb:123
+#: service/lib/agama/storage/manager.rb:124
 msgid "Preparing bootloader proposal"
 msgstr "Préparation du chargeur d'amorçage envisagé"
 
 #. first make bootloader proposal to be sure that required packages are installed
-#: service/lib/agama/storage/manager.rb:128
+#: service/lib/agama/storage/manager.rb:129
 msgid "Adding storage-related packages"
 msgstr "Ajout des paquets relatifs au stockage"
 
-#: service/lib/agama/storage/manager.rb:129
+#: service/lib/agama/storage/manager.rb:130
 msgid "Preparing the storage devices"
 msgstr "Préparation des périphériques de stockage"
 
-#: service/lib/agama/storage/manager.rb:130
+#: service/lib/agama/storage/manager.rb:131
 msgid "Writing bootloader sysconfig"
 msgstr "Écriture du sysconfig du chargeur d'amorçage"
+
+#. Issue representing the proposal is not valid.
+#.
+#. @return [Issue]
+#: service/lib/agama/storage/proposal.rb:189
+msgid "Cannot accommodate the required file systems for installation"
+msgstr ""
+"Impossible d'accommoder les systèmes de fichiers requis pour l'installation"
+
+#. Issue to communicate a generic Y2Storage error.
+#.
+#. @return [Issue]
+#: service/lib/agama/storage/proposal.rb:200
+msgid "A problem ocurred while calculating the storage setup"
+msgstr ""
 
 #. Returns an issue if there is no target device.
 #.
 #. @return [Issue, nil]
-#: service/lib/agama/storage/proposal.rb:195
+#: service/lib/agama/storage/proposal_strategies/guided.rb:122
 msgid "No device selected for installation"
-msgstr ""
+msgstr "Aucun périphérique n'a été sélectionné pour l'installation"
 
 #. Returns an issue if any of the devices required for the proposal is not found
 #.
 #. @return [Issue, nil]
-#: service/lib/agama/storage/proposal.rb:211
+#: service/lib/agama/storage/proposal_strategies/guided.rb:138
 #, perl-brace-format
 msgid "The following selected device is not found in the system: %{devices}"
 msgid_plural ""
 "The following selected devices are not found in the system: %{devices}"
 msgstr[0] ""
+"Le périphérique sélectionné suivant est introuvable dans le système : "
+"%{devices}"
 msgstr[1] ""
-
-#. Returns an issue if the proposal is not valid.
-#.
-#. @return [Issue, nil]
-#: service/lib/agama/storage/proposal.rb:229
-msgid "Cannot accommodate the required file systems for installation"
-msgstr ""
+"Les périphériques sélectionnés suivants sont introuvables dans le système : "
+"%{devices}"

@@ -1,33 +1,35 @@
 pub mod common;
 
-use agama_server::{
-    service,
-    web::{generate_token, MainServiceBuilder, ServiceConfig},
-};
+use agama_lib::auth::AuthToken;
+use agama_server::web::{MainServiceBuilder, ServiceConfig};
 use axum::{
     body::Body,
     http::{Method, Request, StatusCode},
     response::Response,
     routing::get,
-    Router,
 };
-use common::{body_to_string, DBusServer};
-use std::error::Error;
+use common::body_to_string;
+use std::{error::Error, path::PathBuf};
 use tokio::{sync::broadcast::channel, test};
 use tower::ServiceExt;
 
-async fn build_service() -> Router {
-    let (tx, _) = channel(16);
-    let server = DBusServer::new().start().await.unwrap();
-    service(ServiceConfig::default(), tx, server.connection())
-        .await
-        .unwrap()
+fn public_dir() -> PathBuf {
+    std::env::current_dir().unwrap().join("public")
 }
 
 #[test]
 async fn test_ping() -> Result<(), Box<dyn Error>> {
-    let web_service = build_service().await;
-    let request = Request::builder().uri("/ping").body(Body::empty()).unwrap();
+    let config = ServiceConfig::default();
+    let (tx, _) = channel(16);
+    let web_service = MainServiceBuilder::new(tx, public_dir())
+        .add_service("/protected", get(protected))
+        .with_config(config)
+        .build();
+
+    let request = Request::builder()
+        .uri("/api/ping")
+        .body(Body::empty())
+        .unwrap();
 
     let response = web_service.oneshot(request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
@@ -46,13 +48,13 @@ async fn access_protected_route(token: &str, jwt_secret: &str) -> Response {
         jwt_secret: jwt_secret.to_string(),
     };
     let (tx, _) = channel(16);
-    let web_service = MainServiceBuilder::new(tx)
+    let web_service = MainServiceBuilder::new(tx, public_dir())
         .add_service("/protected", get(protected))
         .with_config(config)
         .build();
 
     let request = Request::builder()
-        .uri("/protected")
+        .uri("/api/protected")
         .method(Method::GET)
         .header("Authorization", format!("Bearer {}", token))
         .body(Body::empty())
@@ -64,8 +66,8 @@ async fn access_protected_route(token: &str, jwt_secret: &str) -> Response {
 // TODO: The following test should belong to `auth.rs`
 #[test]
 async fn test_access_protected_route() -> Result<(), Box<dyn Error>> {
-    let token = generate_token("nots3cr3t");
-    let response = access_protected_route(&token, "nots3cr3t").await;
+    let token = AuthToken::generate("nots3cr3t")?;
+    let response = access_protected_route(token.as_str(), "nots3cr3t").await;
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = body_to_string(response.into_body()).await;
@@ -76,8 +78,8 @@ async fn test_access_protected_route() -> Result<(), Box<dyn Error>> {
 // TODO: The following test should belong to `auth.rs`.
 #[test]
 async fn test_access_protected_route_failed() -> Result<(), Box<dyn Error>> {
-    let token = generate_token("nots3cr3t");
-    let response = access_protected_route(&token, "wrong").await;
+    let token = AuthToken::generate("nots3cr3t")?;
+    let response = access_protected_route(token.as_str(), "wrong").await;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     Ok(())
 }

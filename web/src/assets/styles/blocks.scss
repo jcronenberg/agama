@@ -248,7 +248,7 @@ ul[data-type="agama/list"] {
 
   li {
     border: 2px solid var(--color-gray-dark);
-    padding: var(--spacer-normal);
+    padding: var(--spacer-small);
     text-align: start;
     background: var(--color-gray-light);
     margin-block-end: 0;
@@ -276,7 +276,6 @@ ul[data-type="agama/list"] {
   // not belongs to a listbox or grid list ul.
   li[aria-selected] {
     background: var(--color-gray-dark);
-    font-weight: 700;
 
     &:not(:last-child) {
       border-bottom-color: white;
@@ -314,40 +313,36 @@ ul[data-type="agama/list"][role="grid"] {
     div[role="gridcell"] {
       display: flex;
       align-items: center;
-      gap: var(--spacer-normal);
+      gap: var(--spacer-small);
 
-      & > input {
+      input {
         --size: var(--fs-h2);
+        cursor: pointer;
         block-size: var(--size);
         inline-size: var(--size);
+
+        &[data-auto-selected] {
+          accent-color: white;
+          box-shadow: 0 0 1px;
+        }
       }
 
-      & > div {
+      & > div:first-child {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--spacer-small);
+
+        span {
+          font-size: var(--fs-small);
+          font-weight: bold;
+        }
+      }
+
+      & > div:last-child {
         flex: 1;
       }
     }
-  }
-}
-
-// Each kind of list/selector has its way of laying out their items
-[data-items-type="agama/storage-devices"] {
-  display: grid;
-  gap: var(--spacer-smaller);
-  grid-template-columns: 1fr 2fr 2fr;
-  grid-template-areas: "type-and-size drive-info drive-content";
-
-  svg {
-    vertical-align: inherit;
-  }
-
-  > div {
-    margin-block-end: 0;
-  }
-
-  > :first-child {
-    align-self: center;
-    text-align: center;
-    justify-self: start;
   }
 }
 
@@ -383,6 +378,18 @@ ul[data-type="agama/list"][role="grid"] {
   > :nth-child(3) {
     color: var(--color-gray-dimmed);
     text-align: end;
+  }
+}
+
+ul[data-items-type="agama/patterns"] {
+  div[role="gridcell"] {
+    & > div:first-child {
+      min-width: 65px;
+    }
+
+    & > div:last-child * {
+      margin-block-end: var(--spacer-small);
+    }
   }
 }
 
@@ -471,14 +478,7 @@ ul[data-type="agama/list"][role="grid"] {
 
 table[data-type="agama/tree-table"] {
   th:first-child {
-    block-size: fit-content;
     padding-inline-end: var(--spacer-normal);
-  }
-
-  th.fit-content {
-    block-size: fit-content;
-    overflow: visible;
-    text-overflow: unset;
   }
 
   /**

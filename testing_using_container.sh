@@ -6,7 +6,7 @@
 #
 # Details:
 # - container name: agama
-# - port 9090 is exposed so that web UI works
+# - SSL port is exposed at https://localhost:10443 so that web UI works
 # - 'WITH_RUBY_DBUS=1 $0' will prefer ../ruby-dbus to any ruby-dbus.gem
 
 set -x
@@ -17,7 +17,7 @@ CIMAGE=registry.opensuse.org/systemsmanagement/agama/staging/containers/opensuse
 # rename this if you test multiple things
 CNAME=agama
 
-test -f service/agama.gemspec || { echo "You should run this from a checkout of agama"; exit 1; }
+test -f service/agama-yast.gemspec || { echo "You should run this from a git checkout of Agama"; exit 1; }
 
 # destroy the previous instance, can fail if there is no previous instance
 podman stop ${CNAME?} || : no problem if there was nothing to stop
@@ -35,10 +35,10 @@ if [ "${WITH_RUBY_DBUS-}" = 1 ]; then
 fi
 
 podman run --name ${CNAME?} \
-  --privileged --detach --ipc=host \
+  --privileged --detach \
   -v .:/checkout \
   ${MORE_VOLUMES[@]} \
-  -p 9090:9090 \
+  -p 10443:443 \
   ${CIMAGE?}
 
 # shortcut for the following
@@ -46,11 +46,18 @@ CEXEC="podman exec ${CNAME?} bash -c"
 
 ${CEXEC?} "cd /checkout && ./setup.sh"
 
-# Now the CLI is in the same repo, just symlink it
-${CEXEC?} "ln -sfv /checkout/./rust/target/debug/agama /usr/bin/agama"
+echo "Set the Agama (root) password:"
+podman exec -it ${CNAME?} passwd
 
-# Manually start cockpit as socket activation does not work with port forwarding
-${CEXEC?} "systemctl start cockpit"
+set +x
+echo "agama-web-server forwarded to https://localhost:10443/"
+echo "To attach again to the Agama container run:"
+echo "    podman exec --tty --interactive ${CNAME?} bash"
+echo "To stop and remove the Agama container run:"
+echo "    podman stop ${CNAME?}"
+echo "    podman rm ${CNAME?}"
+set -x
 
 # Interactive shell in the container
 podman exec --tty --interactive ${CNAME?} bash
+

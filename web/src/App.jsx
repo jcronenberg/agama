@@ -24,15 +24,12 @@ import { Outlet } from "react-router-dom";
 
 import { useInstallerClient, useInstallerClientStatus } from "~/context/installer";
 import { useProduct } from "./context/product";
-import { STARTUP, INSTALL } from "~/client/phase";
+import { INSTALL, STARTUP } from "~/client/phase";
 import { BUSY } from "~/client/status";
 
-import { DBusError, If, Installation } from "~/components/core";
+import { ServerError, If, Installation } from "~/components/core";
 import { Loading } from "./components/layout";
 import { useInstallerL10n } from "./context/installerL10n";
-
-// D-Bus connection attempts before displaying an error.
-const ATTEMPTS = 3;
 
 /**
  * Main application component.
@@ -43,7 +40,7 @@ const ATTEMPTS = 3;
  */
 function App() {
   const client = useInstallerClient();
-  const { attempt } = useInstallerClientStatus();
+  const { error } = useInstallerClientStatus();
   const { products } = useProduct();
   const { language } = useInstallerL10n();
   const [status, setStatus] = useState(undefined);
@@ -75,9 +72,8 @@ function App() {
   }, [client, setPhase, setStatus]);
 
   const Content = () => {
-    if (!client || !products) {
-      return (attempt > ATTEMPTS) ? <DBusError /> : <Loading />;
-    }
+    if (error) return <ServerError />;
+    if (!products) return <Loading />;
 
     if ((phase === STARTUP && status === BUSY) || phase === undefined || status === undefined) {
       return <Loading />;

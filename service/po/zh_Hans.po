@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-04-07 02:10+0000\n"
+"POT-Creation-Date: 2024-06-09 02:25+0000\n"
 "PO-Revision-Date: 2024-04-10 09:43+0000\n"
 "Last-Translator: Monstorix <monstorix@outlook.com>\n"
 "Language-Team: Chinese (Simplified) <https://l10n.opensuse.org/projects/"
@@ -125,7 +125,7 @@ msgstr "正在还原初始软件仓库"
 #. Repositories that could not be probed are reported as errors.
 #.
 #. @return [Array<Agama::Issue>]
-#: service/lib/agama/software/manager.rb:470
+#: service/lib/agama/software/manager.rb:482
 #, c-format
 msgid "Could not read repository \"%s\""
 msgstr "无法读取仓库 “ %s”"
@@ -133,14 +133,14 @@ msgstr "无法读取仓库 “ %s”"
 #. Issue when a product is missing
 #.
 #. @return [Agama::Issue]
-#: service/lib/agama/software/manager.rb:480
+#: service/lib/agama/software/manager.rb:492
 msgid "Product not selected yet"
 msgstr "尚未选择产品"
 
 #. Issue when a product requires registration but it is not registered yet.
 #.
 #. @return [Agama::Issue]
-#: service/lib/agama/software/manager.rb:489
+#: service/lib/agama/software/manager.rb:501
 msgid "Product must be registered"
 msgstr "产品必须注册"
 
@@ -153,60 +153,67 @@ msgid "Found %s dependency issues."
 msgstr "找到 %s 个依赖问题。"
 
 #. Probes storage devices and performs an initial proposal
-#: service/lib/agama/storage/manager.rb:112
+#: service/lib/agama/storage/manager.rb:113
 msgid "Activating storage devices"
 msgstr "正在激活存储设备"
 
-#: service/lib/agama/storage/manager.rb:113
+#: service/lib/agama/storage/manager.rb:114
 msgid "Probing storage devices"
 msgstr "正在探测存储设备"
 
-#: service/lib/agama/storage/manager.rb:114
+#: service/lib/agama/storage/manager.rb:115
 msgid "Calculating the storage proposal"
 msgstr "正在计算存储提案"
 
-#: service/lib/agama/storage/manager.rb:115
+#: service/lib/agama/storage/manager.rb:116
 msgid "Selecting Linux Security Modules"
 msgstr "正在选择 Linux 安全模块"
 
 #. Prepares the partitioning to install the system
-#: service/lib/agama/storage/manager.rb:123
+#: service/lib/agama/storage/manager.rb:124
 msgid "Preparing bootloader proposal"
 msgstr "正在准备引导加载程序提案"
 
 #. first make bootloader proposal to be sure that required packages are installed
-#: service/lib/agama/storage/manager.rb:128
+#: service/lib/agama/storage/manager.rb:129
 msgid "Adding storage-related packages"
 msgstr "正在添加存储相关软件包"
 
-#: service/lib/agama/storage/manager.rb:129
+#: service/lib/agama/storage/manager.rb:130
 msgid "Preparing the storage devices"
 msgstr "正在准备存储设备"
 
-#: service/lib/agama/storage/manager.rb:130
+#: service/lib/agama/storage/manager.rb:131
 msgid "Writing bootloader sysconfig"
 msgstr "正在写入引导加载程序 sysconfig"
+
+#. Issue representing the proposal is not valid.
+#.
+#. @return [Issue]
+#: service/lib/agama/storage/proposal.rb:189
+msgid "Cannot accommodate the required file systems for installation"
+msgstr "无法调整进行安装所需的文件系统"
+
+#. Issue to communicate a generic Y2Storage error.
+#.
+#. @return [Issue]
+#: service/lib/agama/storage/proposal.rb:200
+msgid "A problem ocurred while calculating the storage setup"
+msgstr ""
 
 #. Returns an issue if there is no target device.
 #.
 #. @return [Issue, nil]
-#: service/lib/agama/storage/proposal.rb:195
+#: service/lib/agama/storage/proposal_strategies/guided.rb:122
 msgid "No device selected for installation"
 msgstr "未选择用于安装的设备"
 
 #. Returns an issue if any of the devices required for the proposal is not found
 #.
 #. @return [Issue, nil]
-#: service/lib/agama/storage/proposal.rb:211
+#: service/lib/agama/storage/proposal_strategies/guided.rb:138
 #, perl-brace-format
 msgid "The following selected device is not found in the system: %{devices}"
 msgid_plural ""
 "The following selected devices are not found in the system: %{devices}"
 msgstr[0] "未在系统中找到下列已选择的设备： %{devices}"
-
-#. Returns an issue if the proposal is not valid.
-#.
-#. @return [Issue, nil]
-#: service/lib/agama/storage/proposal.rb:229
-msgid "Cannot accommodate the required file systems for installation"
-msgstr "无法调整进行安装所需的文件系统"

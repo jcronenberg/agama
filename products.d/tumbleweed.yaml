@@ -42,15 +42,28 @@ translations:
     ja: Tumbleweed ディストリビューションは openSUSE
       の純粋なローリングリリース版で、特定のリリースサイクルによることなく全てのソフトウエアを最新の "安定"
       バージョンに維持し続ける取り組みです。このプロジェクトは特に、最新の安定バージョンを使いたいユーザにお勧めです。
+    nb_NO: Tumbleweed distribusjonen er en ren rullerende utgivelsesversjon av
+      openSUSE som inneholder de siste "stabile" versjonene av all programvare i
+      stedet for å stole på et rigid periodisk utgivelsessykluser. Prosjektet
+      gjør dette for brukere som vil ha de nyeste stabile programvarene.
     pt_BR: A distribuição Tumbleweed é uma versão de lançamento contínuo pura do
       openSUSE contendo as versões "estáveis" mais recentes de todos os
       softwares, em vez de depender de ciclos rígidos de lançamento periódicos.
       O projeto faz isso para usuários que desejam o software estável mais
       recente.
+    ru: Дистрибутив Tumbleweed - это плавающий выпуск openSUSE, содержащий последние
+      "стабильные" версии всего программного обеспечения, вместо того чтобы
+      полагаться на жесткие периодические циклы выпуска. Проект делает его для
+      пользователей, которым нужно самое новое стабильное программное
+      обеспечение.
     sv: Tumbleweed-distributionen är en ren rullande version av openSUSE som
       innehåller de senaste "stabila" versionerna av all programvara istället
       för att förlita sig på stela periodiska utgivningscykler. Projektet gör
       detta för användare som vill ha den senaste stabila programvaran.
+    tr: Tumbleweed dağıtımı, katı periyodik sürüm döngülerine dayanmak yerine, tüm
+      yazılımların en son "kararlı" sürümlerini içeren, openSUSE'nin saf bir
+      sürekli sürüm sürümüdür. Proje bunu en yeni kararlı yazılımı isteyen
+      kullanıcılar için yapıyor.
     zh_Hans: Tumbleweed 发行版是 openSUSE
       的纯滚动发布版本，其并不依赖于严格的定时发布周期，而是持续包含所有最新“稳定”版本的软件。该项目为追求最新稳定软件的用户而生。
 software:
@@ -191,6 +204,7 @@ storage:
     - filesystem: xfs
       size:
         auto: false
+        min: 1 GiB
       outline:
         required: false
         filesystems:

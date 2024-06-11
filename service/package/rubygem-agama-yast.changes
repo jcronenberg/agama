@@ -1,4 +1,61 @@
 -------------------------------------------------------------------
+Wed Jun  5 13:56:54 UTC 2024 - Ancor Gonzalez Sosa <ancor@suse.com>
+
+- Allow to execute the legacy AutoYaST storage proposal
+  (gh#openSUSE/agama#1284).
+
+-------------------------------------------------------------------
+Tue Jun  4 14:16:02 UTC 2024 - José Iván López González <jlopez@suse.com>
+
+- Convert AutoYaST partitioning section to JSON
+  (gh#openSUSE/agama#1285).
+
+-------------------------------------------------------------------
+Mon May 27 12:43:49 UTC 2024 - José Iván López González <jlopez@suse.com>
+
+- Update product mount points as part of the probing (bsc#1225348).
+
+-------------------------------------------------------------------
+Tue May 21 05:32:46 UTC 2024 - José Iván López González <jlopez@suse.com>
+
+- Emit a PropertiesChanged signal for ProductMountPoints and
+  EncryptionMethods properties when the product changes
+  (gh#openSUSE/agama#1236).
+
+-------------------------------------------------------------------
+Fri May 17 09:52:25 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Version 8
+
+-------------------------------------------------------------------
+Thu May 16 15:36:16 UTC 2024 - José Iván López González <jlopez@suse.com>
+
+- Do not probe devices implictly (gh#openSUSE/agama#1226).
+
+-------------------------------------------------------------------
+Wed May 15 12:52:42 UTC 2024 - José Iván López González <jlopez@suse.com>
+
+- Export the device name of the Multipath wires and RAID devices
+  instead of their D-Bus path (gh#openSUSE/agama#1212).
+
+-------------------------------------------------------------------
+Mon May  6 05:13:11 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Remove the dependency on cockpit.socket (gh#openSUSE/agama#1119)
+
+-------------------------------------------------------------------
+Thu Apr 25 13:40:06 UTC 2024 - Ancor Gonzalez Sosa <ancor@suse.com>
+
+- Adapted to recent changes on Y2Storage::GuidedProposal
+  (gh#yast/yast-storage-ng#1382)
+
+-------------------------------------------------------------------
+Thu Apr 18 08:46:06 UTC 2024 - Ladislav Slezák <lslezak@suse.com>
+
+- Display encryption status in the storage result
+  (gh#openSUSE/agama#1155)
+
+-------------------------------------------------------------------
 Wed Apr 10 11:35:53 UTC 2024 - Ladislav Slezák <lslezak@suse.com>
 
 - Fixed setting unlimited maximum partition size

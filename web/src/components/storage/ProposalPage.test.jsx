@@ -115,7 +115,8 @@ const volume = (mountPath) => {
         snapshotsConfigurable: false,
         snapshotsAffectSizes: false,
         sizeRelevantVolumes: [],
-        adjustByRam: false
+        adjustByRam: false,
+        productDefined: false
       }
     }
   );
@@ -150,6 +151,7 @@ beforeEach(() => {
     // @ts-expect-error Some methods have to be private to avoid type complaint.
     proposal: {
       getAvailableDevices: jest.fn().mockResolvedValue([vda, vdb]),
+      getVolumeDevices: jest.fn().mockResolvedValue([vda, vdb]),
       getEncryptionMethods: jest.fn().mockResolvedValue([]),
       getProductMountPoints: jest.fn().mockResolvedValue([]),
       getResult: jest.fn().mockResolvedValue(proposalResult),
