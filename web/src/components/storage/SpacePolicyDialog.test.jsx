@@ -19,12 +19,20 @@
  * find current contact information at www.suse.com.
  */
 
+// @ts-check
+
 import React from "react";
 import { screen, within } from "@testing-library/react";
 import { plainRender, resetLocalStorage } from "~/test-utils";
 import { SPACE_POLICIES } from "~/components/storage/utils";
 import { SpacePolicyDialog } from "~/components/storage";
 
+/**
+ * @typedef {import ("~/client/storage").StorageDevice} StorageDevice
+ * @typedef {import("./SpacePolicyDialog").SpacePolicyDialogProps} SpacePolicyDialogProps
+ */
+
+/** @type {StorageDevice} */
 const sda = {
   sid: 59,
   isDrive: true,
@@ -39,6 +47,7 @@ const sda = {
   sdCard: true,
   active: true,
   name: "/dev/sda",
+  description: "",
   size: 1024,
   recoverableSize: 0,
   systems : [],
@@ -46,12 +55,14 @@ const sda = {
   udevPaths: ["pci-0000:00-12", "pci-0000:00-12-ata"],
 };
 
+/** @type {StorageDevice} */
 const sda1 = {
   sid: 60,
   isDrive: false,
-  type: "",
+  type: "partition",
   active: true,
   name: "/dev/sda1",
+  description: "",
   size: 512,
   recoverableSize: 128,
   systems : [],
@@ -59,12 +70,14 @@ const sda1 = {
   udevPaths: []
 };
 
+/** @type {StorageDevice} */
 const sda2 = {
   sid: 61,
   isDrive: false,
-  type: "",
+  type: "partition",
   active: true,
   name: "/dev/sda2",
+  description: "",
   size: 512,
   recoverableSize: 0,
   systems : [],
@@ -79,6 +92,7 @@ sda.partitionTable = {
   unpartitionedSize: 512
 };
 
+/** @type {StorageDevice} */
 const sdb = {
   sid: 62,
   isDrive: true,
@@ -93,6 +107,7 @@ const sdb = {
   sdCard: false,
   active: true,
   name: "/dev/sdb",
+  description: "",
   size: 2048,
   recoverableSize: 0,
   systems : [],
@@ -105,6 +120,7 @@ const resizePolicy = SPACE_POLICIES.find(p => p.id === "resize");
 const keepPolicy = SPACE_POLICIES.find(p => p.id === "keep");
 const customPolicy = SPACE_POLICIES.find(p => p.id === "custom");
 
+/** @type {SpacePolicyDialogProps} */
 let props;
 
 const expandRow = async (user, name) => {
@@ -194,7 +210,7 @@ describe("SpacePolicyDialog", () => {
       // TODO: use a more inclusive way to disable the actions.
       // https://css-tricks.com/making-disabled-buttons-more-inclusive/
       const spaceActions = screen.getAllByRole("combobox", { name: /Space action selector/, hidden: true });
-      expect(spaceActions.length).toEqual(3);
+      expect(spaceActions.length).toEqual(2);
     });
   });
 
@@ -213,7 +229,7 @@ describe("SpacePolicyDialog", () => {
     it("allows to modify the space actions", async () => {
       plainRender(<SpacePolicyDialog { ...props } />);
       const spaceActions = screen.getAllByRole("combobox", { name: /Space action selector/ });
-      expect(spaceActions.length).toEqual(3);
+      expect(spaceActions.length).toEqual(2);
     });
   });
 
@@ -222,7 +238,7 @@ describe("SpacePolicyDialog", () => {
       props.policy = customPolicy;
     });
 
-    it("renders the space actions selector for devices without partition table", async () => {
+    it("renders the space actions selector for partitions", async () => {
       plainRender(<SpacePolicyDialog { ...props } />);
       // sda has partition table, the selector shouldn't be found
       const sdaRow = screen.getByRole("row", { name: /sda gpt/i });
@@ -232,17 +248,10 @@ describe("SpacePolicyDialog", () => {
       const unusedRow = screen.getByRole("row", { name: /unused space/i });
       const unusedActionsSelector = within(unusedRow).queryByRole("combobox");
       expect(unusedActionsSelector).toBeNull();
-      // sdb does not have partition table, selector should be there
+      // sdb is a disk, selector shouldn't be there
       const sdbRow = screen.getByRole("row", { name: /sdb/ });
-      within(sdbRow).getByRole("combobox");
-    });
-
-    it("does not renders the 'resize' option for drives", async () => {
-      plainRender(<SpacePolicyDialog { ...props } />);
-      const sdbRow = screen.getByRole("row", { name: /sdb/ });
-      const spaceActionsSelector = within(sdbRow).getByRole("combobox");
-      const resizeOption = within(spaceActionsSelector).queryByRole("option", { name: /resize/ });
-      expect(resizeOption).toBeNull();
+      const sdbActionsSelector = within(sdbRow).queryByRole("combobox");
+      expect(sdbActionsSelector).toBeNull();
     });
 
     it("renders the 'resize' option for devices other than drives", async () => {

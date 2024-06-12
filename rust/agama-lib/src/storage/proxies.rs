@@ -29,11 +29,14 @@ trait Storage1 {
     default_path = "/org/opensuse/Agama/Storage1"
 )]
 trait ProposalCalculator {
-    /// Calculate method
+    /// Calculate guided proposal
     fn calculate(
         &self,
         settings: std::collections::HashMap<&str, zbus::zvariant::Value<'_>>,
     ) -> zbus::Result<u32>;
+
+    /// Calculate AutoYaST proposal
+    fn calculate_autoyast(&self, settings: &str) -> zbus::Result<u32>;
 
     /// DefaultVolume method
     fn default_volume(
@@ -45,13 +48,17 @@ trait ProposalCalculator {
     #[dbus_proxy(property)]
     fn available_devices(&self) -> zbus::Result<Vec<zbus::zvariant::OwnedObjectPath>>;
 
+    /// EncryptionMethods property
+    #[dbus_proxy(property)]
+    fn encryption_methods(&self) -> zbus::Result<Vec<String>>;
+
     /// ProductMountPoints property
     #[dbus_proxy(property)]
     fn product_mount_points(&self) -> zbus::Result<Vec<String>>;
 
-    /// Result property
-    #[dbus_proxy(property)]
-    fn result(&self) -> zbus::Result<zbus::zvariant::OwnedObjectPath>;
+    /// Proposal result
+    fn result(&self)
+        -> zbus::Result<std::collections::HashMap<String, zbus::zvariant::OwnedValue>>;
 }
 
 #[dbus_proxy(
@@ -66,67 +73,83 @@ trait Proposal {
         &self,
     ) -> zbus::Result<Vec<std::collections::HashMap<String, zbus::zvariant::OwnedValue>>>;
 
-    /// BootDevice property
+    /// Settings property
     #[dbus_proxy(property)]
-    fn boot_device(&self) -> zbus::Result<String>;
-
-    /// EncryptionMethod property
-    #[dbus_proxy(property)]
-    fn encryption_method(&self) -> zbus::Result<String>;
-
-    /// EncryptionPBKDFunction property
-    #[dbus_proxy(property, name = "EncryptionPBKDFunction")]
-    fn encryption_pbkdfunction(&self) -> zbus::Result<String>;
-
-    /// EncryptionPassword property
-    #[dbus_proxy(property)]
-    fn encryption_password(&self) -> zbus::Result<String>;
-
-    /// LVM property
-    #[dbus_proxy(property, name = "LVM")]
-    fn lvm(&self) -> zbus::Result<bool>;
-
-    /// SpacePolicy property
-    #[dbus_proxy(property)]
-    fn space_policy(&self) -> zbus::Result<String>;
-
-    /// SystemVGDevices property
-    #[dbus_proxy(property, name = "SystemVGDevices")]
-    fn system_vg_devices(&self) -> zbus::Result<Vec<Vec<String>>>;
-
-    /// Volumes property
-    #[dbus_proxy(property)]
-    fn volumes(
+    fn settings(
         &self,
-    ) -> zbus::Result<Vec<std::collections::HashMap<String, zbus::zvariant::OwnedValue>>>;
+    ) -> zbus::Result<std::collections::HashMap<String, zbus::zvariant::OwnedValue>>;
 }
 
 #[dbus_proxy(
-    interface = "org.opensuse.Agama.Storage1.Block",
-    default_service = "org.opensuse.Agama.Storage1"
+    interface = "org.opensuse.Agama.Storage1.ISCSI.Initiator",
+    default_service = "org.opensuse.Agama.Storage1",
+    assume_defaults = true
 )]
-trait BlockDevice {
-    /// Active property
-    #[dbus_proxy(property)]
-    fn active(&self) -> zbus::Result<bool>;
+trait Initiator {
+    /// Delete method
+    fn delete(&self, node: &zbus::zvariant::ObjectPath<'_>) -> zbus::Result<u32>;
 
-    /// Name property
-    #[dbus_proxy(property)]
-    fn name(&self) -> zbus::Result<String>;
+    /// Discover method
+    fn discover(
+        &self,
+        address: &str,
+        port: u32,
+        options: std::collections::HashMap<&str, &zbus::zvariant::Value<'_>>,
+    ) -> zbus::Result<u32>;
 
-    /// Size property
-    #[dbus_proxy(property)]
-    fn size(&self) -> zbus::Result<u64>;
+    /// IBFT property
+    #[dbus_proxy(property, name = "IBFT")]
+    fn ibft(&self) -> zbus::Result<bool>;
 
-    /// Systems property
+    /// InitiatorName property
     #[dbus_proxy(property)]
-    fn systems(&self) -> zbus::Result<Vec<String>>;
+    fn initiator_name(&self) -> zbus::Result<String>;
+    #[dbus_proxy(property)]
+    fn set_initiator_name(&self, value: &str) -> zbus::Result<()>;
+}
 
-    /// UdevIds property
-    #[dbus_proxy(property)]
-    fn udev_ids(&self) -> zbus::Result<Vec<String>>;
+#[dbus_proxy(
+    interface = "org.opensuse.Agama.Storage1.ISCSI.Node",
+    default_service = "org.opensuse.Agama.Storage1",
+    assume_defaults = true
+)]
+trait Node {
+    /// Login method
+    fn login(
+        &self,
+        options: std::collections::HashMap<&str, &zbus::zvariant::Value<'_>>,
+    ) -> zbus::Result<u32>;
 
-    /// UdevPaths property
+    /// Logout method
+    fn logout(&self) -> zbus::Result<u32>;
+
+    /// Address property
     #[dbus_proxy(property)]
-    fn udev_paths(&self) -> zbus::Result<Vec<String>>;
+    fn address(&self) -> zbus::Result<String>;
+
+    /// Connected property
+    #[dbus_proxy(property)]
+    fn connected(&self) -> zbus::Result<bool>;
+
+    /// IBFT property
+    #[dbus_proxy(property, name = "IBFT")]
+    fn ibft(&self) -> zbus::Result<bool>;
+
+    /// Interface property
+    #[dbus_proxy(property)]
+    fn interface(&self) -> zbus::Result<String>;
+
+    /// Port property
+    #[dbus_proxy(property)]
+    fn port(&self) -> zbus::Result<u32>;
+
+    /// Startup property
+    #[dbus_proxy(property)]
+    fn startup(&self) -> zbus::Result<String>;
+    #[dbus_proxy(property)]
+    fn set_startup(&self, value: &str) -> zbus::Result<()>;
+
+    /// Target property
+    #[dbus_proxy(property)]
+    fn target(&self) -> zbus::Result<String>;
 }

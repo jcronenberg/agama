@@ -2,12 +2,12 @@
 
 use super::proxies::{FirstUser as FirstUserFromDBus, Users1Proxy};
 use crate::error::ServiceError;
-use agama_settings::{settings::Settings, SettingValue, SettingsError};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use zbus::Connection;
 
 /// Represents the settings for the first user
-#[derive(Serialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FirstUser {
     /// First user's full name
     pub full_name: String,
@@ -34,38 +34,8 @@ impl FirstUser {
     }
 }
 
-// TODO: use the Settings macro (add support for ignoring fields to the macro and use Option for
-// FirstUser fields)
-impl Settings for FirstUser {
-    fn set(&mut self, attr: &str, value: SettingValue) -> Result<(), SettingsError> {
-        match attr {
-            "full_name" => {
-                self.full_name = value
-                    .try_into()
-                    .map_err(|e| SettingsError::UpdateFailed(attr.to_string(), e))?
-            }
-            "user_name" => {
-                self.user_name = value
-                    .try_into()
-                    .map_err(|e| SettingsError::UpdateFailed(attr.to_string(), e))?
-            }
-            "password" => {
-                self.full_name = value
-                    .try_into()
-                    .map_err(|e| SettingsError::UpdateFailed(attr.to_string(), e))?
-            }
-            "autologin" => {
-                self.full_name = value
-                    .try_into()
-                    .map_err(|e| SettingsError::UpdateFailed(attr.to_string(), e))?
-            }
-            _ => return Err(SettingsError::UnknownAttribute(attr.to_string())),
-        }
-        Ok(())
-    }
-}
-
 /// D-Bus client for the users service
+#[derive(Clone)]
 pub struct UsersClient<'a> {
     users_proxy: Users1Proxy<'a>,
 }
@@ -89,6 +59,10 @@ impl<'a> UsersClient<'a> {
         encrypted: bool,
     ) -> Result<u32, ServiceError> {
         Ok(self.users_proxy.set_root_password(value, encrypted).await?)
+    }
+
+    pub async fn remove_root_password(&self) -> Result<u32, ServiceError> {
+        Ok(self.users_proxy.remove_root_password().await?)
     }
 
     /// Whether the root password is set or not
@@ -120,5 +94,9 @@ impl<'a> UsersClient<'a> {
                 std::collections::HashMap::new(),
             )
             .await
+    }
+
+    pub async fn remove_first_user(&self) -> zbus::Result<bool> {
+        Ok(self.users_proxy.remove_first_user().await? == 0)
     }
 }

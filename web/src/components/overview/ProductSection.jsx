@@ -44,22 +44,22 @@ const Content = ({ isLoading = false }) => {
 
   return (
     <Text>
-      {/* TRANSLATORS: %s is replaced by a product name (e.g., SUSE ALP-Dolomite) */}
+      {/* TRANSLATORS: %s is replaced by a product name (e.g. SLES) */}
       {isRegistered ? sprintf(_("%s (registered)"), productName) : productName}
     </Text>
   );
 };
 
 export default function ProductSection() {
-  const { software } = useInstallerClient();
+  const { product } = useInstallerClient();
   const [issues, setIssues] = useState([]);
   const { selectedProduct } = useProduct();
   const { cancellablePromise } = useCancellablePromise();
 
   useEffect(() => {
-    cancellablePromise(software.product.getIssues()).then(setIssues);
-    return software.product.onIssuesChange(setIssues);
-  }, [cancellablePromise, setIssues, software]);
+    cancellablePromise(product.getIssues()).then(setIssues);
+    return product.onIssuesChange(setIssues);
+  }, [cancellablePromise, setIssues, product]);
 
   const isLoading = !selectedProduct;
   const errors = isLoading ? [] : errorsFrom(issues);

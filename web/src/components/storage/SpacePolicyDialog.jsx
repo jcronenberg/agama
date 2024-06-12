@@ -68,23 +68,27 @@ const SpacePolicyPicker = ({ currentPolicy, onChange = noop }) => {
  * Renders a dialog that allows the user to select the space policy and actions.
  * @component
  *
- * @param {object} props
- * @param {SpacePolicy} props.policy
- * @param {SpaceAction[]} props.actions
- * @param {StorageDevice[]} props.devices
- * @param {boolean} [props.isOpen=false]
- * @param {() => void} [props.onCancel=noop]
- * @param {(spaceConfig: SpaceConfig) => void} [props.onAccept=noop]
+ * @typedef {object} SpacePolicyDialogProps
+ * @property {SpacePolicy} policy
+ * @property {SpaceAction[]} actions
+ * @property {StorageDevice[]} devices
+ * @property {boolean} [isOpen=false]
+ * @property {boolean} [isLoading]
+ * @property {() => void} [onCancel=noop]
+ * @property {(spaceConfig: SpaceConfig) => void} [onAccept=noop]
  *
  * @typedef {object} SpaceConfig
  * @property {SpacePolicy} spacePolicy
  * @property {SpaceAction[]} spaceActions
+ *
+ * @param {SpacePolicyDialogProps} props
  */
 export default function SpacePolicyDialog({
   policy: defaultPolicy,
   actions: defaultActions,
   devices,
   isOpen,
+  isLoading,
   onCancel = noop,
   onAccept = noop,
   ...props
@@ -94,8 +98,11 @@ export default function SpacePolicyDialog({
   const [customUsed, setCustomUsed] = useState(false);
   const [expandedDevices, setExpandedDevices] = useState([]);
 
+  if (!policy && defaultPolicy) { setPolicy(defaultPolicy) }
+  if (!actions && defaultActions) { setActions(defaultActions) }
+
   useEffect(() => {
-    if (policy.id === "custom") setExpandedDevices(devices);
+    if (policy && policy.id === "custom") setExpandedDevices(devices);
   }, [devices, policy, setExpandedDevices]);
 
   // The selectors for the space action have to be initialized always to the same value
@@ -104,29 +111,22 @@ export default function SpacePolicyDialog({
 
   // Stores whether the custom policy has been used.
   useEffect(() => {
-    if (policy.id === "custom" && !customUsed) setCustomUsed(true);
+    if (policy && policy.id === "custom" && !customUsed) setCustomUsed(true);
   }, [policy, customUsed, setCustomUsed]);
 
   // Resets actions (i.e., sets everything to "keep") if the custom policy has not been used yet.
   useEffect(() => {
-    if (policy.id !== "custom" && !customUsed) setActions([]);
+    if (policy && policy.id !== "custom" && !customUsed) setActions([]);
   }, [policy, customUsed, setActions]);
 
   // Generates the action value according to the policy.
   const deviceAction = (device) => {
-    let action;
-
     if (policy.id === "custom") {
-      action = actions.find(a => a.device === device.name)?.action || "keep";
-    } else {
-      const policyAction = { delete: "force_delete", resize: "resize", keep: "keep" };
-      action = policyAction[policy.id];
+      return actions.find(a => a.device === device.name)?.action || "keep";
     }
 
-    // For a drive device (e.g., Disk, RAID) it does not make sense to offer the resize action.
-    // At this moment, the Agama backend generates a resize action for drives if the policy is set
-    // to 'resize'. In that cases, the action is converted here to 'keep'.
-    return ((device.isDrive && action === "resize") ? "keep" : action);
+    const policyAction = { delete: "force_delete", resize: "resize", keep: "keep" };
+    return policyAction[policy.id];
   };
 
   const changeActions = (spaceAction) => {
@@ -149,7 +149,9 @@ in the devices listed below. Choose how to do it.");
       title={_("Find space")}
       description={description}
       isOpen={isOpen}
-      variant="medium"
+      isLoading={isLoading}
+      blockSize="large"
+      inlineSize="large"
       {...props}
     >
       <Form id="space-policy-form" onSubmit={onSubmit}>
@@ -161,7 +163,7 @@ in the devices listed below. Choose how to do it.");
               devices={devices}
               expandedDevices={expandedDevices}
               deviceAction={deviceAction}
-              isActionDisabled={policy.id !== "custom"}
+              isActionDisabled={policy?.id !== "custom"}
               onActionChange={changeActions}
             />
           }

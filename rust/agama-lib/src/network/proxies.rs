@@ -25,6 +25,9 @@ trait Device {
     /// Type property
     #[dbus_proxy(property)]
     fn type_(&self) -> zbus::Result<u8>;
+    /// State property
+    #[dbus_proxy(property)]
+    fn state(&self) -> zbus::Result<u8>;
 }
 
 #[dbus_proxy(
@@ -109,6 +112,10 @@ trait Connection {
     fn mac_address(&self) -> zbus::Result<String>;
     #[dbus_proxy(property)]
     fn set_mac_address(&self, mac_address: &str) -> zbus::Result<()>;
+    #[dbus_proxy(property)]
+    fn mtu(&self) -> zbus::Result<u32>;
+    #[dbus_proxy(property)]
+    fn set_mtu(&self, mtu: u32) -> zbus::Result<()>;
 }
 
 #[dbus_proxy(

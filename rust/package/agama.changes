@@ -1,4 +1,184 @@
 -------------------------------------------------------------------
+Tue Jun 11 21:35:00 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- CLI: use the master token /run/agama/token if available and
+  readable (gh#openSUSE/agama#1287).
+- CLI: remove the "config add/set" subcommands
+  (gh#openSUSE/agama#1314).
+
+-------------------------------------------------------------------
+Mon Jun 10 14:24:33 UTC 2024 - Jorik Cronenberg <jorik.cronenberg@suse.com>
+
+- Add mtu property for network connections
+  (gh#openSUSE/agama#1101).
+
+-------------------------------------------------------------------
+Fri Jun  7 05:58:48 UTC 2024 - Michal Filka <mfilka@suse.com>
+
+- Improvements in HTTPS setup
+  - self-signed certificate contains hostname
+  - self-signed certificate is stored into default location
+  - before creating new self-signed certificate a default location
+    (/etc/agama.d/ssl) is checked for a certificate 
+  - gh#openSUSE/agama#1228
+
+-------------------------------------------------------------------
+Wed Jun  5 13:53:59 UTC 2024 - José Iván López González <jlopez@suse.com>
+
+- Process the legacyAutoyastStorage section of the profile
+  (gh#openSUSE/agama#1284).
+
+-------------------------------------------------------------------
+Mon Jun  3 07:49:16 UTC 2024 - Josef Reidinger <jreidinger@suse.com>
+
+- CLI: Add new commands "agama download" and
+  "agama profile autoyast" and remove "agama profile download" to
+  separate common curl-like download and autoyast specific one
+  which do conversion to json (gh#openSUSE/agama#1279)
+
+-------------------------------------------------------------------
+Wed May 29 12:15:37 UTC 2024 - Josef Reidinger <jreidinger@suse.com>
+
+- CLI: Add new command "agama profile import" that does the whole
+  autoinstallation processing and loads the configuration
+  (gh#openSUSE/agama#1270).
+
+-------------------------------------------------------------------
+Wed May 29 11:16:11 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Improve command-line interface help (gh#openSUSE/agama#1269 and
+  (gh#openSUSE/agama#1273).
+- agama-web-server connects to D-Bus only when needed
+  (gh#openSUSE/agama#1273).
+
+-------------------------------------------------------------------
+Wed May 29 10:40:21 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- The HTTP request to perform a probing is not blocking anymore
+  (gh#openSUSE/agama#1272).
+
+-------------------------------------------------------------------
+Mon May 27 14:11:55 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- The "agama auth" command reads the password from the standard
+  input (gh#openSUSE/agama#1265).
+
+-------------------------------------------------------------------
+Mon May 27 05:49:46 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Add agama.libssonnet to the spec file (gh#openSUSE/agama#1261).
+
+-------------------------------------------------------------------
+Thu May 23 15:47:28 UTC 2024 - Ladislav Slezák <lslezak@suse.com>
+
+- Avoid deadlock when "setxkbmap" call gets stucked, use a timeout
+  (gh#openSUSE/agama#1249)
+
+-------------------------------------------------------------------
+Wed May 22 12:31:25 UTC 2024 - Josef Reidinger <jreidinger@suse.com>
+
+- autoinstallation jsonnet: Inject complete lshw json output and
+  provide helper functions for filtering it (gh#openSUSE/agama#1242)
+
+-------------------------------------------------------------------
+Fri May 17 09:52:25 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Version 8
+
+-------------------------------------------------------------------
+Tue May 16 12:48:42 UTC 2024 - Knut Anderssen <kanderssen@suse.com>
+
+- Allow to download Agama logs through the manager HTTP API
+  (gh#openSUSE/agama#1216).
+
+-------------------------------------------------------------------
+Thu May 16 12:34:43 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Restarting agama.service causes agama-web-server.service to be
+  restarted too (gh#openSUSE/agama#1222).
+
+-------------------------------------------------------------------
+Thu May 16 12:24:26 UTC 2024 - José Iván López González <jlopez@suse.com>
+
+- Small changes in the storage HTTP API (gh#openSUSE/agama#1208):
+  - /storage/proposal/usable_devices (get): returns a list of SIDs
+    instead of device names.
+  - /storage/proposal/settings (put): returns whether the proposal
+    was successfully calculated.
+
+-------------------------------------------------------------------
+Thu May 16 10:31:38 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- The CLI does not fail when the storage proposal is missing
+  (gh#openSUSE/agama#1220).
+- Properly detect whether LVM is activated.
+
+-------------------------------------------------------------------
+Thu May 16 06:19:36 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Change the web server to listen on port 80 by default
+  (gh#openSUSE/agama#1217).
+
+-------------------------------------------------------------------
+Wed May 15 15:21:30 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Improve logging in the D-Bus and web servers
+  (gh#openSUSE/agama#1215):
+  - Write to the stdout if they are not connected to
+    systemd-journald.
+  - The stdout logger includes the file/line (it was already
+    included when logging to systemd-journald).
+
+-------------------------------------------------------------------
+Wed May 15 14:08:26 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Do not crash if the /etc/agama.d/locales file does not contain
+  any valid locale (gh#openSUSE/agama#1213).
+
+-------------------------------------------------------------------
+Tue May 14 12:39:49 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- If present, read the locales list from the /etc/agama.d/locales
+  file (gh#openSUSE/agama#1205).
+
+-------------------------------------------------------------------
+Tue May 14 10:48:42 UTC 2024 - Knut Anderssen <kanderssen@suse.com>
+
+- Dropped the network D-Bus service as it is not needed anymore
+  (gh#openSUSE/agama#1199).
+
+-------------------------------------------------------------------
+Mon May 13 09:01:21 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Extend the storage HTTP API to support handling the iSCSI
+  configuration (gh#openSUSE/agama#1187).
+
+-------------------------------------------------------------------
+Mon May 13 08:47:27 UTC 2024 - José Iván López González <jlopez@suse.com>
+
+- Provide HTTP API for storage (gh#openSUSE/agama#1175).
+
+-------------------------------------------------------------------
+Mon May  6 05:13:54 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Extend the HTTP/JSON API:
+  - Localization (gh#openSUSE/agama#1047, gh#openSUSE/agama#1120).
+  - Networking (gh#openSUSE/agama#1064).
+  - Software (gh#openSUSE/agama#1069).
+  - Manager service (gh#openSUSE/agama#1089).
+  - Questions (gh#openSUSE/agama#1091).
+  - Progress interface (gh#openSUSE/agama#1092).
+  - Issues interface (gh#openSUSE/agama#1100).
+  - Users (gh#openSUSE/agama#1117).
+  - Product registration (gh#openSUSE/agama#1146).
+- Add an "agama-web-server" service (gh#openSUSE/agama/1119).
+- Fix the generation of the self-signed certificate
+  (gh#openSUSE/agama#1131).
+- Improve agama-server logging (gh#openSUSE/agama#1143).
+- Provide frontend translations via the /po.js path
+  (gh#openSUSE/agama#1126).
+
+-------------------------------------------------------------------
 Wed Mar  13 12:42:58 UTC 2024 - Jorik Cronenberg <jorik.cronenberg@suse.com>
 
 - Add infiniband to network model (gh#openSUSE/agama#1032).

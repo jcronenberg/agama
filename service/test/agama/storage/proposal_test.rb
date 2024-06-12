@@ -57,13 +57,13 @@ describe Agama::Storage::Proposal do
   end
 
   describe "#success?" do
-    it "returns false if calculate has not been called yet" do
+    it "returns false if no calculate has been called yet" do
       expect(subject.success?).to eq(false)
     end
 
-    context "if calculate was already called" do
+    context "if calculate_guided was already called" do
       before do
-        subject.calculate(settings)
+        subject.calculate_guided(settings)
       end
 
       context "and the proposal was successful" do
@@ -84,11 +84,11 @@ describe Agama::Storage::Proposal do
     end
   end
 
-  describe "#calculate" do
+  describe "#calculate_guided" do
     it "calculates a new proposal with the given settings" do
       expect(Y2Storage::StorageManager.instance.proposal).to be_nil
 
-      subject.calculate(achievable_settings)
+      subject.calculate_guided(achievable_settings)
 
       expect(Y2Storage::StorageManager.instance.proposal).to_not be_nil
       y2storage_settings = Y2Storage::StorageManager.instance.proposal.settings
@@ -108,12 +108,12 @@ describe Agama::Storage::Proposal do
       expect(callback1).to receive(:call)
       expect(callback2).to receive(:call)
 
-      subject.calculate(achievable_settings)
+      subject.calculate_guided(achievable_settings)
     end
 
     it "returns whether the proposal was successful" do
-      expect(subject.calculate(achievable_settings)).to eq(true)
-      expect(subject.calculate(impossible_settings)).to eq(false)
+      expect(subject.calculate_guided(achievable_settings)).to eq(true)
+      expect(subject.calculate_guided(impossible_settings)).to eq(false)
     end
 
     context "if the given device settings sets a disk as target" do
@@ -127,7 +127,7 @@ describe Agama::Storage::Proposal do
         end
 
         it "sets the first available device as target device for volumes" do
-          subject.calculate(achievable_settings)
+          subject.calculate_guided(achievable_settings)
           y2storage_settings = Y2Storage::StorageManager.instance.proposal.settings
 
           expect(y2storage_settings.volumes).to contain_exactly(
@@ -148,11 +148,39 @@ describe Agama::Storage::Proposal do
         end
 
         it "sets the first available device as candidate device" do
-          subject.calculate(achievable_settings)
+          subject.calculate_guided(achievable_settings)
           y2storage_settings = Y2Storage::StorageManager.instance.proposal.settings
 
           expect(y2storage_settings.candidate_devices).to contain_exactly("/dev/sda")
         end
+      end
+    end
+
+    context "if the system has not been probed yet" do
+      before do
+        allow(Y2Storage::StorageManager.instance).to receive(:probed?).and_return(false)
+      end
+
+      it "does not calculate a proposal" do
+        subject.calculate_guided(achievable_settings)
+        expect(Y2Storage::StorageManager.instance.proposal).to be_nil
+      end
+
+      it "does not run the callbacks" do
+        callback1 = proc {}
+        callback2 = proc {}
+
+        subject.on_calculate(&callback1)
+        subject.on_calculate(&callback2)
+
+        expect(callback1).to_not receive(:call)
+        expect(callback2).to_not receive(:call)
+
+        subject.calculate_guided(achievable_settings)
+      end
+
+      it "returns false" do
+        expect(subject.calculate_guided(achievable_settings)).to eq(false)
       end
     end
   end
@@ -164,7 +192,7 @@ describe Agama::Storage::Proposal do
 
     context "if the proposal was already calculated" do
       before do
-        subject.calculate(achievable_settings)
+        subject.calculate_guided(achievable_settings)
       end
 
       it "returns the settings used for calculating the proposal" do
@@ -187,7 +215,7 @@ describe Agama::Storage::Proposal do
 
     context "if the proposal failed" do
       before do
-        subject.calculate(impossible_settings)
+        subject.calculate_guided(impossible_settings)
       end
 
       it "returns an empty list" do
@@ -197,7 +225,7 @@ describe Agama::Storage::Proposal do
 
     context "if the proposal was successful" do
       before do
-        subject.calculate(achievable_settings)
+        subject.calculate_guided(achievable_settings)
       end
 
       it "returns the actions from the actiongraph" do
@@ -214,7 +242,7 @@ describe Agama::Storage::Proposal do
     end
 
     it "returns an empty list if the current proposal is successful" do
-      subject.calculate(achievable_settings)
+      subject.calculate_guided(achievable_settings)
 
       expect(subject.issues).to eq([])
     end
@@ -223,7 +251,7 @@ describe Agama::Storage::Proposal do
       let(:settings) { impossible_settings }
 
       it "includes an error because the volumes cannot be accommodated" do
-        subject.calculate(settings)
+        subject.calculate_guided(settings)
 
         expect(subject.issues).to include(
           an_object_having_attributes(description: /Cannot accommodate/)
@@ -233,13 +261,14 @@ describe Agama::Storage::Proposal do
       context "and the settings does not indicate a target device" do
         before do
           # Avoid to automatically set the first device
-          allow(subject).to receive(:available_devices).and_return([])
+          allow(Y2Storage::StorageManager.instance.probed_disk_analyzer)
+            .to receive(:candidate_disks).and_return([])
         end
 
         let(:settings) { impossible_settings.tap { |s| s.device.name = nil } }
 
         it "includes an error because a device is not selected" do
-          subject.calculate(settings)
+          subject.calculate_guided(settings)
 
           expect(subject.issues).to include(
             an_object_having_attributes(description: /No device selected/)
@@ -259,7 +288,7 @@ describe Agama::Storage::Proposal do
         let(:settings) { impossible_settings.tap { |s| s.device.name = "/dev/vdz" } }
 
         it "includes an error because the device is not found" do
-          subject.calculate(settings)
+          subject.calculate_guided(settings)
 
           expect(subject.issues).to include(
             an_object_having_attributes(description: /is not found/)

@@ -97,8 +97,8 @@ function uniq(collection) {
  *
  * @todo Use https://github.com/JedWatson/classnames instead?
  *
- * @param {...*} CSS classes to join
- * @returns {String} CSS classes joined together after ignoring falsy values
+ * @param {...*} classes - CSS classes to join
+ * @returns {String} - CSS classes joined together after ignoring falsy values
  */
 function classNames(...classes) {
   return classes.filter((item) => !!item).join(' ');
@@ -209,9 +209,9 @@ const useLocalStorage = (storageKey, fallbackState) => {
  *
  * Source {@link https://designtechworld.medium.com/create-a-custom-debounce-hook-in-react-114f3f245260}
  *
- * @param {function} callback - Function to be called after some delay.
+ * @param {Function} callback - Function to be called after some delay.
  * @param {number} delay - Delay in milliseconds.
- * @returns {function}
+ * @returns {Function}
  *
  * @example
  *
@@ -255,7 +255,7 @@ const hex = (value) => {
  *
  * @todo This conversion will not be needed after adapting Section to directly work with issues.
  *
- * @param {import("~/client/mixins").Issue} issues
+ * @param {import("~/client/mixins").Issue} issue
  * @returns {import("~/client/mixins").ValidationError}
  */
 const toValidationError = (issue) => ({ message: issue.description });
@@ -306,9 +306,7 @@ const localConnection = (location = window.location) => {
   // forced local behavior
   if (process.env.LOCAL_CONNECTION === "1") return true;
 
-  // when running in a development server use the COCKPIT_TARGET_URL value
-  // (a proxy is used) otherwise use the page URL from the browser
-  const hostname = process.env.WEBPACK_SERVE ? (new URL(COCKPIT_TARGET_URL)).hostname : location.hostname;
+  const hostname = location.hostname;
 
   // using the loopback device? (hostname or IP address)
   return hostname === "localhost" || hostname.startsWith("127.");

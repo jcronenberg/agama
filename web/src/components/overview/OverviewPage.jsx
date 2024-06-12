@@ -22,14 +22,14 @@
 import React, { useState } from "react";
 import { useProduct } from "~/context/product";
 import { Navigate } from "react-router-dom";
-import { Page, InstallButton } from "~/components/core";
+import { InstallButton, Page } from "~/components/core";
 import {
   L10nSection,
   NetworkSection,
   ProductSection,
   SoftwareSection,
   StorageSection,
-  UsersSection
+  UsersSection,
 } from "~/components/overview";
 import { _ } from "~/i18n";
 

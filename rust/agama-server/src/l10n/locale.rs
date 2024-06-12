@@ -1,11 +1,11 @@
 //! This module provides support for reading the locales database.
 
 use crate::error::Error;
-use agama_locale_data::{InvalidLocaleCode, LocaleCode};
+use agama_locale_data::{InvalidLocaleCode, LocaleId};
 use anyhow::Context;
 use serde::Serialize;
 use serde_with::{serde_as, DisplayFromStr};
-use std::process::Command;
+use std::{fs, process::Command};
 
 /// Represents a locale, including the localized language and territory.
 #[serde_as]
@@ -13,7 +13,7 @@ use std::process::Command;
 pub struct LocaleEntry {
     /// The locale code (e.g., "es_ES.UTF-8").
     #[serde_as(as = "DisplayFromStr")]
-    pub code: LocaleCode,
+    pub id: LocaleId,
     /// Localized language name (e.g., "Spanish", "Español", etc.)
     pub language: String,
     /// Localized territory name (e.g., "Spain", "España", etc.)
@@ -26,7 +26,7 @@ pub struct LocaleEntry {
 /// translations are obtained from the `agama_locale_data` crate.
 #[derive(Default)]
 pub struct LocalesDatabase {
-    known_locales: Vec<LocaleCode>,
+    known_locales: Vec<LocaleId>,
     locales: Vec<LocaleEntry>,
 }
 
@@ -37,18 +37,12 @@ impl LocalesDatabase {
 
     /// Loads the list of locales.
     ///
+    /// It checks for a file in /etc/agama.d/locales containing the list of supported locales (one per line).
+    /// It it does not exists, calls `localectl list-locales`.
+    ///
     /// * `ui_language`: language to translate the descriptions (e.g., "en").
     pub fn read(&mut self, ui_language: &str) -> Result<(), Error> {
-        let result = Command::new("localectl")
-            .args(["list-locales"])
-            .output()
-            .context("Failed to get the list of locales")?;
-        let output =
-            String::from_utf8(result.stdout).context("Invalid UTF-8 sequence from list-locales")?;
-        self.known_locales = output
-            .lines()
-            .filter_map(|line| TryInto::<LocaleCode>::try_into(line).ok())
-            .collect();
+        self.known_locales = Self::get_locales_list()?;
         self.locales = self.get_locales(ui_language)?;
         Ok(())
     }
@@ -56,10 +50,10 @@ impl LocalesDatabase {
     /// Determines whether a locale exists in the database.
     pub fn exists<T>(&self, locale: T) -> bool
     where
-        T: TryInto<LocaleCode>,
+        T: TryInto<LocaleId>,
         T::Error: Into<InvalidLocaleCode>,
     {
-        if let Ok(locale) = TryInto::<LocaleCode>::try_into(locale) {
+        if let Ok(locale) = TryInto::<LocaleId>::try_into(locale) {
             return self.known_locales.contains(&locale);
         }
 
@@ -101,7 +95,7 @@ impl LocalesDatabase {
                 .unwrap_or(territory.id.to_string());
 
             let entry = LocaleEntry {
-                code: code.clone(),
+                id: code.clone(),
                 language: language_label,
                 territory: territory_label,
             };
@@ -110,20 +104,50 @@ impl LocalesDatabase {
 
         Ok(result)
     }
+
+    fn get_locales_list() -> Result<Vec<LocaleId>, Error> {
+        const LOCALES_LIST_PATH: &str = "/etc/agama.d/locales";
+
+        let locales = fs::read_to_string(LOCALES_LIST_PATH).map(Self::get_locales_from_string);
+
+        if let Ok(locales) = locales {
+            if !locales.is_empty() {
+                return Ok(locales);
+            }
+        }
+
+        let result = Command::new("localectl")
+            .args(["list-locales"])
+            .output()
+            .context("Failed to get the list of locales")?;
+
+        let locales = String::from_utf8(result.stdout)
+            .map(Self::get_locales_from_string)
+            .context("Invalid UTF-8 sequence from list-locales")?;
+
+        Ok(locales)
+    }
+
+    fn get_locales_from_string(locales: String) -> Vec<LocaleId> {
+        locales
+            .lines()
+            .filter_map(|line| TryInto::<LocaleId>::try_into(line).ok())
+            .collect()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::LocalesDatabase;
-    use agama_locale_data::LocaleCode;
+    use agama_locale_data::LocaleId;
 
     #[test]
     fn test_read_locales() {
         let mut db = LocalesDatabase::new();
         db.read("de").unwrap();
         let found_locales = db.entries();
-        let spanish: LocaleCode = "es_ES".try_into().unwrap();
-        let found = found_locales.iter().find(|l| l.code == spanish).unwrap();
+        let spanish: LocaleId = "es_ES".try_into().unwrap();
+        let found = found_locales.iter().find(|l| l.id == spanish).unwrap();
         assert_eq!(&found.language, "Spanisch");
         assert_eq!(&found.territory, "Spanien");
     }

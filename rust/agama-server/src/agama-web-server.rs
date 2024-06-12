@@ -1,8 +1,17 @@
-use agama_lib::connection_to;
+use std::{
+    path::{Path, PathBuf},
+    pin::Pin,
+    process::{ExitCode, Termination},
+};
+
+use agama_lib::{auth::AuthToken, connection_to};
 use agama_server::{
+    cert::Certificate,
     l10n::helpers,
+    logs::init_logging,
     web::{self, run_monitor},
 };
+use anyhow::Context;
 use axum::{
     extract::Request as AxumRequest,
     http::{Request, Response},
@@ -13,89 +22,123 @@ use futures_util::pin_mut;
 use hyper::body::Incoming;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
-use openssl::ssl::{Ssl, SslAcceptor, SslFiletype, SslMethod};
-use std::process::{ExitCode, Termination};
-use std::{path::PathBuf, pin::Pin};
+use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
 use tokio::sync::broadcast::channel;
 use tokio_openssl::SslStream;
 use tower::Service;
-use tracing_subscriber::prelude::*;
 use utoipa::OpenApi;
+
+const DEFAULT_WEB_UI_DIR: &str = "/usr/share/agama/web_ui";
+const TOKEN_FILE: &str = "/run/agama/token";
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Start the API server.
+    /// Starts the API server.
+    ///
+    /// This command starts the server in the given ports. The secondary port, if enabled, uses SSL.
+    /// If no certificate is specified, agama-web-server generates a self-signed one.
     Serve(ServeArgs),
-    /// Display the API documentation in OpenAPI format.
+    /// Generates the API documentation in OpenAPI format.
     Openapi,
 }
 
+/// Manage Agama's HTTP/JSON API.
+///
+/// Agama's public interface is composed by an HTTP/JSON API and a WebSocket. Using this API is
+/// possible to inspect or change the configuration, start the installation process and monitor
+/// changes and progress. This program, agama-web-server, implements such an API.
+///
+/// To start the API, use the "serve" command. If you want to get an OpenAPI representation, just go
+/// for the "doc" command.
 #[derive(Parser, Debug)]
-#[command(
-    version,
-    about = "Starts the Agama web-based API.",
-    long_about = None)]
+#[command(max_term_width = 100)]
 struct Cli {
     #[command(subcommand)]
     pub command: Commands,
 }
 
+fn find_web_ui_dir() -> PathBuf {
+    if let Ok(home) = std::env::var("HOME") {
+        let path = Path::new(&home).join(".local/share/agama");
+        if path.exists() {
+            return path;
+        }
+    }
+
+    Path::new(DEFAULT_WEB_UI_DIR).into()
+}
+
 #[derive(Args, Debug)]
 struct ServeArgs {
-    // Address/port to listen on (":::3000" listens for both IPv6 and IPv4
-    // connections unless manually disabled in /proc/sys/net/ipv6/bindv6only)
-    #[arg(long, default_value = ":::3000", help = "Primary address to listen on")]
+    // Address/port to listen on. ":::80" listens for both IPv6 and IPv4
+    // connections unless manually disabled in /proc/sys/net/ipv6/bindv6only.
+    /// Primary port to listen on
+    #[arg(long, default_value = ":::80")]
     address: String,
-    #[arg(
-        long,
-        default_value = None,
-        help = "Optional secondary address to listen on"
-    )]
+
+    /// Optional secondary address to listen on
+    #[arg(long, default_value = None)]
     address2: Option<String>,
-    #[arg(
-        long,
-        default_value = None,
-        help = "Path to the SSL private key file in PEM format"
-    )]
-    key: Option<String>,
-    #[arg(
-        long,
-        default_value = None,
-        help = "Path to the SSL certificate file in PEM format"
-    )]
-    cert: Option<String>,
+
+    #[arg(long, default_value = "/etc/agama.d/ssl/key.pem")]
+    key: Option<PathBuf>,
+
+    #[arg(long, default_value = "/etc/agama.d/ssl/cert.pem")]
+    cert: Option<PathBuf>,
+
     // Agama D-Bus address
-    #[arg(
-        long,
-        default_value = "unix:path=/run/agama/bus",
-        help = "The D-Bus address for connecting to the Agama service"
-    )]
+    #[arg(long, default_value = "unix:path=/run/agama/bus")]
     dbus_address: String,
+
+    // Directory containing the web UI code
+    #[arg(long)]
+    web_ui_dir: Option<PathBuf>,
 }
 
 impl ServeArgs {
-    /// Builds an SSL acceptor using a provided SSL certificate or generates a self-signed one
-    fn ssl_acceptor(&self) -> Result<SslAcceptor, openssl::error::ErrorStack> {
-        let mut tls_builder = SslAcceptor::mozilla_modern_v5(SslMethod::tls_server())?;
-
-        if let (Some(cert), Some(key)) = (self.cert.clone(), self.key.clone()) {
-            tracing::info!("Loading PEM certificate: {}", cert);
-            tls_builder.set_certificate_file(PathBuf::from(cert), SslFiletype::PEM)?;
-
-            tracing::info!("Loading PEM key: {}", key);
-            tls_builder.set_private_key_file(PathBuf::from(key), SslFiletype::PEM)?;
-        } else {
-            let (cert, key) = agama_server::cert::create_certificate()?;
-
-            tls_builder.set_private_key(&key)?;
-            tls_builder.set_certificate(&cert)?;
-        }
-
-        // check that the key belongs to the certificate
-        tls_builder.check_private_key()?;
-
-        Ok(tls_builder.build())
+    /// Returns true of given path to certificate points to an existing file
+    fn valid_cert_path(&self) -> bool {
+        self.cert.as_ref().is_some_and(|c| Path::new(&c).exists())
     }
+
+    /// Returns true of given path to key points to an existing file
+    fn valid_key_path(&self) -> bool {
+        self.key.as_ref().is_some_and(|k| Path::new(&k).exists())
+    }
+
+    /// Takes options provided by user and loads / creates Certificate struct according to them
+    fn to_certificate(&self) -> anyhow::Result<Certificate> {
+        if self.valid_cert_path() && self.valid_key_path() {
+            let cert = self.cert.clone().unwrap();
+            let key = self.key.clone().unwrap();
+
+            // read the provided certificate
+            Certificate::read(cert.as_path(), key.as_path())
+        } else {
+            // ask for self-signed certificate
+            let certificate = Certificate::new()?;
+
+            // write the certificate for the later use
+            // for now do not care if writing self generated certificate failed or not, in the
+            // worst case we will generate new one ... which will surely be better
+            let _ = certificate.write();
+
+            Ok(certificate)
+        }
+    }
+}
+
+/// Builds an SSL acceptor using a provided SSL certificate or generates a self-signed one
+fn ssl_acceptor(certificate: &Certificate) -> Result<SslAcceptor, openssl::error::ErrorStack> {
+    let mut tls_builder = SslAcceptor::mozilla_modern_v5(SslMethod::tls_server())?;
+
+    tls_builder.set_private_key(&certificate.key)?;
+    tls_builder.set_certificate(&certificate.cert)?;
+
+    // check that the key belongs to the certificate
+    tls_builder.check_private_key()?;
+
+    Ok(tls_builder.build())
 }
 
 /// Checks whether the connection uses SSL or not
@@ -267,19 +310,22 @@ async fn start_server(address: String, service: Router, ssl_acceptor: SslAccepto
 /// Start serving the API.
 /// `options`: command-line arguments.
 async fn serve_command(args: ServeArgs) -> anyhow::Result<()> {
-    let journald = tracing_journald::layer().expect("could not connect to journald");
-    tracing_subscriber::registry().with(journald).init();
+    _ = helpers::init_locale();
+    init_logging().context("Could not initialize the logger")?;
 
     let (tx, _) = channel(16);
     run_monitor(tx.clone()).await?;
 
     let config = web::ServiceConfig::load()?;
-    let dbus = connection_to(&args.dbus_address).await?;
-    let service = web::service(config, tx, dbus).await?;
 
+    write_token(TOKEN_FILE, &config.jwt_secret).context("could not create the token file")?;
+
+    let dbus = connection_to(&args.dbus_address).await?;
+    let web_ui_dir = args.web_ui_dir.clone().unwrap_or(find_web_ui_dir());
+    let service = web::service(config, tx, dbus, web_ui_dir).await?;
     // TODO: Move elsewhere? Use a singleton? (It would be nice to use the same
     // generated self-signed certificate on both ports.)
-    let ssl_acceptor = if let Ok(ssl_acceptor) = args.ssl_acceptor() {
+    let ssl_acceptor = if let Ok(ssl_acceptor) = ssl_acceptor(&args.to_certificate()?) {
         ssl_acceptor
     } else {
         return Err(anyhow::anyhow!("SSL initialization failed"));
@@ -320,6 +366,11 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
     }
 }
 
+fn write_token(path: &str, secret: &str) -> anyhow::Result<()> {
+    let token = AuthToken::generate(secret)?;
+    Ok(token.write(path)?)
+}
+
 /// Represents the result of execution.
 pub enum CliResult {
     /// Successful execution.
@@ -337,7 +388,6 @@ impl Termination for CliResult {
 #[tokio::main]
 async fn main() -> CliResult {
     let cli = Cli::parse();
-    _ = helpers::init_locale();
 
     if let Err(error) = run_command(cli).await {
         eprintln!("{:?}", error);

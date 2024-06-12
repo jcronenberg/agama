@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Copyright (c) [2022-2023] SUSE LLC
+# Copyright (c) [2022-2024] SUSE LLC
 #
 # All Rights Reserved.
 #
@@ -23,6 +23,7 @@ require "yast"
 require "bootloader/proposal_client"
 require "y2storage/storage_manager"
 require "y2storage/clients/inst_prepdisk"
+require "agama/storage/actions"
 require "agama/storage/proposal"
 require "agama/storage/proposal_settings"
 require "agama/storage/callbacks"
@@ -157,7 +158,17 @@ module Agama
       #
       # @return [Agama::DBus::Clients::Software]
       def software
-        @software ||= DBus::Clients::Software.new
+        @software ||= DBus::Clients::Software.instance
+      end
+
+      # Storage actions.
+      #
+      # @return [Array<Y2Storage::CompoundAction>]
+      def actions
+        return [] unless Y2Storage::StorageManager.instance.probed?
+
+        staging = Y2Storage::StorageManager.instance.staging
+        Actions.new(logger, staging.actiongraph).all
       end
 
     private
@@ -195,7 +206,7 @@ module Agama
       # Calculates the proposal using the settings from the config file.
       def calculate_proposal
         settings = ProposalSettingsReader.new(config).read
-        proposal.calculate(settings)
+        proposal.calculate_guided(settings)
       end
 
       # Adds the required packages to the list of resolvables to install

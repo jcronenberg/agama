@@ -23,20 +23,14 @@
 // cspell:ignore ptable
 
 import { compact, hex, uniq } from "~/utils";
-import DBusClient from "./dbus";
-import { WithIssues, WithStatus, WithProgress } from "./mixins";
+import { WithIssues, WithProgress, WithStatus } from "./mixins";
+import { HTTPClient } from "./http";
 
+const SERVICE_NAME = "org.opensuse.Agama.Storage1";
 const STORAGE_OBJECT = "/org/opensuse/Agama/Storage1";
-const STORAGE_IFACE = "org.opensuse.Agama.Storage1";
 const STORAGE_JOBS_NAMESPACE = "/org/opensuse/Agama/Storage1/jobs";
 const STORAGE_JOB_IFACE = "org.opensuse.Agama.Storage1.Job";
-const STORAGE_SYSTEM_NAMESPACE = "/org/opensuse/Agama/Storage1/system";
-const STORAGE_STAGING_NAMESPACE = "/org/opensuse/Agama/Storage1/staging";
-const PROPOSAL_IFACE = "org.opensuse.Agama.Storage1.Proposal";
-const PROPOSAL_CALCULATOR_IFACE = "org.opensuse.Agama.Storage1.Proposal.Calculator";
-const ISCSI_INITIATOR_IFACE = "org.opensuse.Agama.Storage1.ISCSI.Initiator";
-const ISCSI_NODES_NAMESPACE = "/org/opensuse/Agama/Storage1/iscsi_nodes";
-const ISCSI_NODE_IFACE = "org.opensuse.Agama.Storage1.ISCSI.Node";
+const ISCSI_NODES_NAMESPACE = "/storage/iscsi/nodes";
 const DASD_MANAGER_IFACE = "org.opensuse.Agama.Storage1.DASD.Manager";
 const DASD_DEVICES_NAMESPACE = "/org/opensuse/Agama/Storage1/dasds";
 const DASD_DEVICE_IFACE = "org.opensuse.Agama.Storage1.DASD.Device";
@@ -46,6 +40,13 @@ const ZFCP_CONTROLLERS_NAMESPACE = "/org/opensuse/Agama/Storage1/zfcp_controller
 const ZFCP_CONTROLLER_IFACE = "org.opensuse.Agama.Storage1.ZFCP.Controller";
 const ZFCP_DISKS_NAMESPACE = "/org/opensuse/Agama/Storage1/zfcp_disks";
 const ZFCP_DISK_IFACE = "org.opensuse.Agama.Storage1.ZFCP.Disk";
+
+/** @fixme Adapt code depending on D-Bus */
+class DBusClient {
+  proxy() {
+    return Promise.resolve(undefined);
+  }
+}
 
 /**
  * @typedef {object} StorageDevice
@@ -62,8 +63,8 @@ const ZFCP_DISK_IFACE = "org.opensuse.Agama.Storage1.ZFCP.Disk";
  * @property {string} [transport]
  * @property {boolean} [sdCard]
  * @property {boolean} [dellBOSS]
- * @property {string[]} [devices] - RAID devices (only for "raid" and "md" types)
- * @property {string[]} [wires] - Multipath wires (only for "multipath" type)
+ * @property {StorageDevice[]} [devices] - RAID devices (only for "raid" and "md" types)
+ * @property {StorageDevice[]} [wires] - Multipath wires (only for "multipath" type)
  * @property {string} [level] - MD RAID level (only for "md" type)
  * @property {string} [uuid]
  * @property {number} [start] - First block of the region (only for block devices)
@@ -99,6 +100,7 @@ const ZFCP_DISK_IFACE = "org.opensuse.Agama.Storage1.ZFCP.Disk";
  * @property {number} sid
  * @property {string} type
  * @property {string} [mountPath]
+ * @property {string} [label]
  *
  * @typedef {object} ProposalResult
  * @property {ProposalSettings} settings
@@ -150,6 +152,7 @@ const ZFCP_DISK_IFACE = "org.opensuse.Agama.Storage1.ZFCP.Disk";
  *
  * @typedef {object} VolumeOutline
  * @property {boolean} required
+ * @property {boolean} productDefined
  * @property {string[]} fsTypes
  * @property {boolean} adjustByRam
  * @property {boolean} supportAutoSize
@@ -194,25 +197,6 @@ const EncryptionMethods = Object.freeze({
 });
 
 /**
- * Removes properties with undefined value
- *
- * @example
- * removeUndefinedCockpitProperties({
- *  property1: { t: "s", v: "foo" },
- *  property2: { t: b, v: false },
- *  property3: { t: "s", v: undefined }
- * });
- * //returns { property1: { t: "s", v: "foo" }, property2: { t: "b", v: false } }
- *
- * @param {object} cockpitObject
- * @returns {object}
- */
-const removeUndefinedCockpitProperties = (cockpitObject) => {
-  const filtered = Object.entries(cockpitObject).filter(([, { v }]) => v !== undefined);
-  return Object.fromEntries(filtered);
-};
-
-/**
  * Gets the basename of a D-Bus path
  *
  * @example
@@ -229,8 +213,8 @@ const dbusBasename = (path) => path.split("/").slice(-1)[0];
  */
 class DevicesManager {
   /**
-   * @param {DBusClient} client
-   * @param {string} rootPath - Root path of the devices tree
+   * @param {HTTPClient} client
+   * @param {string} rootPath - path of the devices tree, either system or staging
    */
   constructor(client, rootPath) {
     this.client = client;
@@ -243,158 +227,145 @@ class DevicesManager {
    * @returns {Promise<StorageDevice[]>}
    */
   async getDevices() {
-    const buildDevice = (path, dbusDevices) => {
-      const addDeviceProperties = (device, dbusProperties) => {
-        device.sid = dbusProperties.SID.v;
-        device.name = dbusProperties.Name.v;
-        device.description = dbusProperties.Description.v;
+    const buildDevice = (jsonDevice, jsonDevices) => {
+      /** @type {() => StorageDevice} */
+      const buildDefaultDevice = () => {
+        return {
+          sid: 0,
+          name: "",
+          description: "",
+          isDrive: false,
+          type: ""
+        };
       };
 
-      const addDriveProperties = (device, dbusProperties) => {
+      /** @type {(names: string[]) => StorageDevice[]} */
+      const buildCollectionFromNames = (names) => {
+        return names.map(name => ({ ...buildDefaultDevice(), name }));
+      };
+
+      /** @type {(sids: String[], jsonDevices: object[]) => StorageDevice[]} */
+      const buildCollection = (sids, jsonDevices) => {
+        if (sids === null || sids === undefined) return [];
+
+        return sids.map(sid => buildDevice(jsonDevices.find(dev => dev.deviceInfo?.sid === sid), jsonDevices));
+      };
+
+      /** @type {(device: StorageDevice, info: object) => void} */
+      const addDriveInfo = (device, info) => {
         device.isDrive = true;
-        device.type = dbusProperties.Type.v;
-        device.vendor = dbusProperties.Vendor.v;
-        device.model = dbusProperties.Model.v;
-        device.driver = dbusProperties.Driver.v;
-        device.bus = dbusProperties.Bus.v;
-        device.busId = dbusProperties.BusId.v;
-        device.transport = dbusProperties.Transport.v;
-        device.sdCard = dbusProperties.Info.v.SDCard.v;
-        device.dellBOSS = dbusProperties.Info.v.DellBOSS.v;
+        device.type = info.type;
+        device.vendor = info.vendor;
+        device.model = info.model;
+        device.driver = info.driver;
+        device.bus = info.bus;
+        device.busId = info.busId;
+        device.transport = info.transport;
+        device.sdCard = info.info.sdCard;
+        device.dellBOSS = info.info.dellBOSS;
       };
 
-      const addRAIDProperties = (device, raidProperties) => {
-        device.devices = raidProperties.Devices.v.map(d => buildDevice(d, dbusDevices));
+      /** @type {(device: StorageDevice, info: object) => void} */
+      const addRaidInfo = (device, info) => {
+        device.devices = buildCollectionFromNames(info.devices);
       };
 
-      const addMultipathProperties = (device, multipathProperties) => {
-        device.wires = multipathProperties.Wires.v.map(d => buildDevice(d, dbusDevices));
+      /** @type {(device: StorageDevice, info: object) => void} */
+      const addMultipathInfo = (device, info) => {
+        device.wires = buildCollectionFromNames(info.wires);
       };
 
-      const addMDProperties = (device, mdProperties) => {
+      /** @type {(device: StorageDevice, info: object) => void} */
+      const addMDInfo = (device, info) => {
         device.type = "md";
-        device.level = mdProperties.Level.v;
-        device.uuid = mdProperties.UUID.v;
-        device.devices = mdProperties.Devices.v.map(d => buildDevice(d, dbusDevices));
+        device.level = info.level;
+        device.uuid = info.uuid;
+        device.devices = buildCollection(info.devices, jsonDevices);
       };
 
-      const addBlockProperties = (device, blockProperties) => {
-        device.active = blockProperties.Active.v;
-        device.encrypted = blockProperties.Encrypted.v;
-        device.start = blockProperties.Start.v;
-        device.size = blockProperties.Size.v;
-        device.recoverableSize = blockProperties.RecoverableSize.v;
-        device.systems = blockProperties.Systems.v;
-        device.udevIds = blockProperties.UdevIds.v;
-        device.udevPaths = blockProperties.UdevPaths.v;
-      };
-
-      const addPartitionProperties = (device, partitionProperties) => {
+      /** @type {(device: StorageDevice, info: object) => void} */
+      const addPartitionInfo = (device, info) => {
         device.type = "partition";
-        device.isEFI = partitionProperties.EFI.v;
+        device.isEFI = info.efi;
       };
 
-      const addLvmVgProperties = (device, lvmVgProperties) => {
+      /** @type {(device: StorageDevice, info: object) => void} */
+      const addVgInfo = (device, info) => {
         device.type = "lvmVg";
-        device.size = lvmVgProperties.Size.v;
-        device.physicalVolumes = lvmVgProperties.PhysicalVolumes.v.map(d => buildDevice(d, dbusDevices));
-        device.logicalVolumes = lvmVgProperties.LogicalVolumes.v.map(d => buildDevice(d, dbusDevices));
+        device.size = info.size;
+        device.physicalVolumes = buildCollection(info.physicalVolumes, jsonDevices);
+        device.logicalVolumes = buildCollection(info.logicalVolumes, jsonDevices);
       };
 
-      const addLvmLvProperties = (device) => {
+      /** @type {(device: StorageDevice, info: object) => void} */
+      const addLvInfo = (device, _info) => {
         device.type = "lvmLv";
       };
 
-      const addPtableProperties = (device, ptableProperties) => {
-        const buildPartitionSlot = ([start, size]) => ({ start, size });
-        const partitions = ptableProperties.Partitions.v.map(p => buildDevice(p, dbusDevices));
+      /** @type {(device: StorageDevice, tableInfo: object) => void} */
+      const addPTableInfo = (device, tableInfo) => {
+        const partitions = buildCollection(tableInfo.partitions, jsonDevices);
         device.partitionTable = {
-          type: ptableProperties.Type.v,
+          type: tableInfo.type,
           partitions,
           unpartitionedSize: device.size - partitions.reduce((s, p) => s + p.size, 0),
-          unusedSlots: ptableProperties.UnusedSlots.v.map(buildPartitionSlot)
+          unusedSlots: tableInfo.unusedSlots.map(s => Object.assign({}, s))
         };
       };
 
-      const addFilesystemProperties = (device, filesystemProperties) => {
+      /** @type {(device: StorageDevice, filesystemInfo: object) => void} */
+      const addFilesystemInfo = (device, filesystemInfo) => {
         const buildMountPath = path => path.length > 0 ? path : undefined;
         const buildLabel = label => label.length > 0 ? label : undefined;
         device.filesystem = {
-          sid: filesystemProperties.SID.v,
-          type: filesystemProperties.Type.v,
-          mountPath: buildMountPath(filesystemProperties.MountPath.v),
-          label: buildLabel(filesystemProperties.Label.v)
+          sid: filesystemInfo.sid,
+          type: filesystemInfo.type,
+          mountPath: buildMountPath(filesystemInfo.mountPath),
+          label: buildLabel(filesystemInfo.label)
         };
       };
 
-      const addComponentProperties = (device, componentProperties) => {
+      /** @type {(device: StorageDevice, info: object) => void} */
+      const addComponentInfo = (device, info) => {
         device.component = {
-          type: componentProperties.Type.v,
-          deviceNames: componentProperties.DeviceNames.v
+          type: info.type,
+          deviceNames: info.deviceNames
         };
       };
 
-      const device = {
-        sid: path.split("/").pop(),
-        name: "",
-        description: "",
-        isDrive: false,
-        type: ""
+      const device = buildDefaultDevice();
+
+      /** @type {(jsonProperty: String, info: function) => void} */
+      const process = (jsonProperty, method) => {
+        const info = jsonDevice[jsonProperty];
+        if (info === undefined || info === null) return;
+
+        method(device, info);
       };
 
-      const dbusDevice = dbusDevices[path];
-      if (!dbusDevice) return device;
-
-      const deviceProperties = dbusDevice["org.opensuse.Agama.Storage1.Device"];
-      if (deviceProperties !== undefined) addDeviceProperties(device, deviceProperties);
-
-      const driveProperties = dbusDevice["org.opensuse.Agama.Storage1.Drive"];
-      if (driveProperties !== undefined) addDriveProperties(device, driveProperties);
-
-      const raidProperties = dbusDevice["org.opensuse.Agama.Storage1.RAID"];
-      if (raidProperties !== undefined) addRAIDProperties(device, raidProperties);
-
-      const multipathProperties = dbusDevice["org.opensuse.Agama.Storage1.Multipath"];
-      if (multipathProperties !== undefined) addMultipathProperties(device, multipathProperties);
-
-      const mdProperties = dbusDevice["org.opensuse.Agama.Storage1.MD"];
-      if (mdProperties !== undefined) addMDProperties(device, mdProperties);
-
-      const blockProperties = dbusDevice["org.opensuse.Agama.Storage1.Block"];
-      if (blockProperties !== undefined) addBlockProperties(device, blockProperties);
-
-      const partitionProperties = dbusDevice["org.opensuse.Agama.Storage1.Partition"];
-      if (partitionProperties !== undefined) addPartitionProperties(device, partitionProperties);
-
-      const lvmVgProperties = dbusDevice["org.opensuse.Agama.Storage1.LVM.VolumeGroup"];
-      if (lvmVgProperties !== undefined) addLvmVgProperties(device, lvmVgProperties);
-
-      const lvmLvProperties = dbusDevice["org.opensuse.Agama.Storage1.LVM.LogicalVolume"];
-      if (lvmLvProperties !== undefined) addLvmLvProperties(device);
-
-      const ptableProperties = dbusDevice["org.opensuse.Agama.Storage1.PartitionTable"];
-      if (ptableProperties !== undefined) addPtableProperties(device, ptableProperties);
-
-      const filesystemProperties = dbusDevice["org.opensuse.Agama.Storage1.Filesystem"];
-      if (filesystemProperties !== undefined) addFilesystemProperties(device, filesystemProperties);
-
-      const componentProperties = dbusDevice["org.opensuse.Agama.Storage1.Component"];
-      if (componentProperties !== undefined) addComponentProperties(device, componentProperties);
+      process("deviceInfo", Object.assign);
+      process("drive", addDriveInfo);
+      process("raid", addRaidInfo);
+      process("multipath", addMultipathInfo);
+      process("md", addMDInfo);
+      process("blockDevice", Object.assign);
+      process("partition", addPartitionInfo);
+      process("lvmVg", addVgInfo);
+      process("lvmLv", addLvInfo);
+      process("partitionTable", addPTableInfo);
+      process("filesystem", addFilesystemInfo);
+      process("component", addComponentInfo);
 
       return device;
     };
 
-    const managedObjects = await this.client.call(
-      STORAGE_OBJECT,
-      "org.freedesktop.DBus.ObjectManager",
-      "GetManagedObjects",
-      null
-    );
-
-    const dbusObjects = managedObjects.shift();
-    const systemPaths = Object.keys(dbusObjects).filter(k => k.startsWith(this.rootPath));
-
-    return systemPaths.map(p => buildDevice(p, dbusObjects));
+    const response = await this.client.get(`/storage/devices/${this.rootPath}`);
+    if (!response.ok) {
+      console.warn("Failed to get storage devices: ", response);
+      return [];
+    }
+    const jsonDevices = await response.json();
+    return jsonDevices.map(d => buildDevice(d, jsonDevices));
   }
 }
 
@@ -403,15 +374,12 @@ class DevicesManager {
  */
 class ProposalManager {
   /**
-   * @param {DBusClient} client
+   * @param {HTTPClient} client
    * @param {DevicesManager} system
    */
   constructor(client, system) {
     this.client = client;
     this.system = system;
-    this.proxies = {
-      proposalCalculator: this.client.proxy(PROPOSAL_CALCULATOR_IFACE, STORAGE_OBJECT)
-    };
   }
 
   /**
@@ -420,19 +388,57 @@ class ProposalManager {
    * @returns {Promise<StorageDevice[]>}
    */
   async getAvailableDevices() {
-    const findDevice = (devices, path) => {
-      const sid = path.split("/").pop();
-      const device = devices.find(d => d.sid === Number(sid));
+    const findDevice = (devices, sid) => {
+      const device = devices.find(d => d.sid === sid);
 
-      if (device === undefined) console.log("D-Bus object not found: ", path);
+      if (device === undefined) console.warn("Device not found: ", sid);
 
       return device;
     };
 
     const systemDevices = await this.system.getDevices();
 
-    const proxy = await this.proxies.proposalCalculator;
-    return proxy.AvailableDevices.map(path => findDevice(systemDevices, path)).filter(d => d);
+    const response = await this.client.get("/storage/proposal/usable_devices");
+    if (!response.ok) {
+      console.warn("Failed to get usable devices: ", response);
+      return [];
+    }
+    const usable_devices = await response.json();
+    return usable_devices.map(sid => findDevice(systemDevices, sid)).filter(d => d);
+  }
+
+  /**
+   * Gets the devices that can be selected as target for a volume.
+   *
+   * A device can be selected as target for a volume if either it is an available device for
+   * installation or it is a device built over the available devices for installation. For example,
+   * a MD RAID is a possible target only if all its members are available devices or children of the
+   * available devices.
+   *
+   * @returns {Promise<StorageDevice[]>}
+   */
+  async getVolumeDevices() {
+    /** @type {StorageDevice[]} */
+    const availableDevices = await this.getAvailableDevices();
+
+    /** @type {(device: StorageDevice) => boolean} */
+    const isAvailable = (device) => {
+      const isChildren = (device, parentDevice) => {
+        const partitions = parentDevice.partitionTable?.partitions || [];
+        return !!partitions.find(d => d.name === device.name);
+      };
+
+      return !!availableDevices.find(d => d.name === device.name || isChildren(device, d));
+    };
+
+    /** @type {(device: StorageDevice[]) => boolean} */
+    const allAvailable = (devices) => devices.every(isAvailable);
+
+    const system = await this.system.getDevices();
+    const mds = system.filter(d => d.type === "md" && allAvailable(d.devices));
+    const vgs = system.filter(d => d.type === "lvmVg" && allAvailable(d.physicalVolumes));
+
+    return [...availableDevices, ...mds, ...vgs];
   }
 
   /**
@@ -441,8 +447,13 @@ class ProposalManager {
    * @returns {Promise<string[]>}
    */
   async getProductMountPoints() {
-    const proxy = await this.proxies.proposalCalculator;
-    return proxy.ProductMountPoints;
+    const response = await this.client.get("/storage/product/params");
+    if (!response.ok) {
+      console.warn("Failed to get product params: ", response);
+      return [];
+    }
+
+    return response.json().then(params => params.mountPoints);
   }
 
   /**
@@ -451,20 +462,35 @@ class ProposalManager {
    * @returns {Promise<string[]>}
    */
   async getEncryptionMethods() {
-    const proxy = await this.proxies.proposalCalculator;
-    return proxy.EncryptionMethods;
+    const response = await this.client.get("/storage/product/params");
+    if (!response.ok) {
+      console.warn("Failed to get product params: ", response);
+      return [];
+    }
+
+    return response.json().then(params => params.encryptionMethods);
   }
 
   /**
    * Obtains the default volume for the given mount path
    *
    * @param {string} mountPath
-   * @returns {Promise<Volume>}
+   * @returns {Promise<Volume|undefined>}
    */
   async defaultVolume(mountPath) {
-    const proxy = await this.proxies.proposalCalculator;
+    const param = encodeURIComponent(mountPath);
+    const response = await this.client.get(`/storage/product/volume_for?mount_path=${param}`);
+    if (!response.ok) {
+      console.warn("Failed to get product volume: ", response);
+      return undefined;
+    }
+
     const systemDevices = await this.system.getDevices();
-    return this.buildVolume(await proxy.DefaultVolume(mountPath), systemDevices);
+    const productMountPoints = await this.getProductMountPoints();
+
+    return response.json().then(volume => {
+      return this.buildVolume(volume, systemDevices, productMountPoints);
+    });
   }
 
   /**
@@ -473,279 +499,182 @@ class ProposalManager {
    * @return {Promise<ProposalResult|undefined>}
   */
   async getResult() {
-    const proxy = await this.proposalProxy();
+    const settingsResponse = await this.client.get("/storage/proposal/settings");
+    if (!settingsResponse.ok) {
+      console.warn("Failed to get proposal settings: ", settingsResponse);
+      return undefined;
+    }
 
-    if (!proxy) return undefined;
+    const actionsResponse = await this.client.get("/storage/proposal/actions");
+    if (!actionsResponse.ok) {
+      console.warn("Failed to get proposal actions: ", actionsResponse);
+      return undefined;
+    }
 
-    const systemDevices = await this.system.getDevices();
-
-    const buildResult = (proxy) => {
-      const buildSpaceAction = dbusSpaceAction => {
-        return {
-          device: dbusSpaceAction.Device.v,
-          action: dbusSpaceAction.Action.v
-        };
-      };
-
-      const buildAction = dbusAction => {
-        return {
-          device: dbusAction.Device.v,
-          text: dbusAction.Text.v,
-          subvol: dbusAction.Subvol.v,
-          delete: dbusAction.Delete.v
-        };
-      };
-
-      /**
-       * Builds the proposal target from a D-Bus value.
-       *
-       * @param {string} dbusTarget
-       * @returns {ProposalTarget}
-       */
-      const buildTarget = (dbusTarget) => {
-        switch (dbusTarget) {
-          case "disk": return "DISK";
-          case "newLvmVg": return "NEW_LVM_VG";
-          case "reusedLvmVg": return "REUSED_LVM_VG";
-          default:
-            console.info(`Unknown proposal target "${dbusTarget}", using "disk".`);
-            return "DISK";
-        }
-      };
-
-      const buildTargetPVDevices = dbusTargetPVDevices => {
-        if (!dbusTargetPVDevices) return [];
-
-        return dbusTargetPVDevices.v.map(d => d.v);
-      };
-
-      // TODO: Read installation devices from D-Bus.
-      const buildInstallationDevices = (dbusSettings, devices) => {
-        const findDevice = (name) => {
-          const device = devices.find(d => d.name === name);
-
-          if (device === undefined) console.error("D-Bus object not found: ", name);
-
-          return device;
-        };
-
-        const values = [
-          dbusSettings.TargetDevice?.v,
-          buildTargetPVDevices(dbusSettings.TargetPVDevices),
-          dbusSettings.BootDevice.v,
-          dbusSettings.Volumes.v.map(vol => vol.v.TargetDevice.v)
-        ].flat();
-
-        const names = uniq(compact(values)).filter(d => d.length > 0);
-
-        // #findDevice returns undefined if no device is found with the given name.
-        return compact(names.map(findDevice));
-      };
-
-      const dbusSettings = proxy.Settings;
-
-      return {
-        settings: {
-          target: buildTarget(dbusSettings.Target.v),
-          targetDevice: dbusSettings.TargetDevice?.v,
-          targetPVDevices: buildTargetPVDevices(dbusSettings.TargetPVDevices),
-          configureBoot: dbusSettings.ConfigureBoot.v,
-          bootDevice: dbusSettings.BootDevice.v,
-          defaultBootDevice: dbusSettings.DefaultBootDevice.v,
-          spacePolicy: dbusSettings.SpacePolicy.v,
-          spaceActions: dbusSettings.SpaceActions.v.map(a => buildSpaceAction(a.v)),
-          encryptionPassword: dbusSettings.EncryptionPassword.v,
-          encryptionMethod: dbusSettings.EncryptionMethod.v,
-          volumes: dbusSettings.Volumes.v.map(vol => this.buildVolume(vol.v, systemDevices)),
-          // NOTE: strictly speaking, installation devices does not belong to the settings. It
-          // should be a separate method instead of an attribute in the settings object.
-          // Nevertheless, it was added here for simplicity and to avoid passing more props in some
-          // react components. Please, do not use settings as a jumble.
-          installationDevices: buildInstallationDevices(proxy.Settings, systemDevices)
-        },
-        actions: proxy.Actions.map(buildAction)
-      };
+    /**
+     * Builds the proposal target from a D-Bus value.
+     *
+     * @param {string} value
+     * @returns {ProposalTarget}
+     */
+    const buildTarget = (value) => {
+      switch (value) {
+        case "disk": return "DISK";
+        case "newLvmVg": return "NEW_LVM_VG";
+        case "reusedLvmVg": return "REUSED_LVM_VG";
+        default:
+          console.info(`Unknown proposal target "${value}", using "disk".`);
+          return "DISK";
+      }
     };
 
-    return buildResult(proxy);
+    /** @todo Read installation devices from D-Bus. */
+    const buildInstallationDevices = (settings, devices) => {
+      const findDevice = (name) => {
+        const device = devices.find(d => d.name === name);
+
+        if (device === undefined) console.error("Device object not found: ", name);
+
+        return device;
+      };
+
+      // Only consider the device assigned to a volume as installation device if it is needed
+      // to find space in that device. For example, devices directly formatted or mounted are not
+      // considered as installation devices.
+      const volumes = settings.volumes.filter(vol => (
+        [VolumeTargets.NEW_PARTITION, VolumeTargets.NEW_VG].includes(vol.target))
+      );
+
+      const values = [
+        settings.targetDevice,
+        settings.targetPVDevices,
+        volumes.map(v => v.targetDevice)
+      ].flat();
+
+      if (settings.configureBoot) values.push(settings.bootDevice);
+
+      const names = uniq(compact(values)).filter(d => d.length > 0);
+
+      // #findDevice returns undefined if no device is found with the given name.
+      return compact(names.sort().map(findDevice));
+    };
+
+    const settings = await settingsResponse.json();
+    const actions = await actionsResponse.json();
+
+    const systemDevices = await this.system.getDevices();
+    const productMountPoints = await this.getProductMountPoints();
+
+    return {
+      settings: {
+        ...settings,
+        target: buildTarget(settings.target),
+        volumes: settings.volumes.map(v => this.buildVolume(v, systemDevices, productMountPoints)),
+        // NOTE: strictly speaking, installation devices does not belong to the settings. It
+        // should be a separate method instead of an attribute in the settings object.
+        // Nevertheless, it was added here for simplicity and to avoid passing more props in some
+        // react components. Please, do not use settings as a jumble.
+        installationDevices: buildInstallationDevices(settings, systemDevices)
+      },
+      actions
+    };
   }
 
   /**
    * Calculates a new proposal
    *
    * @param {ProposalSettings} settings
-   * @returns {Promise<number>} 0 on success, 1 on failure
+   * @returns {Promise<boolean>} true on success
    */
   async calculate(settings) {
-    const {
-      target,
-      targetDevice,
-      targetPVDevices,
-      configureBoot,
-      bootDevice,
-      encryptionPassword,
-      encryptionMethod,
-      spacePolicy,
-      spaceActions,
-      volumes
-    } = settings;
-
-    const dbusSpaceActions = () => {
-      const dbusSpaceAction = (spaceAction) => {
-        return {
-          Device: { t: "s", v: spaceAction.device },
-          Action: { t: "s", v: spaceAction.action }
-        };
+    const buildHttpVolume = (volume) => {
+      return {
+        autoSize: volume.autoSize,
+        fsType: volume.fsType,
+        maxSize: volume.maxSize,
+        minSize: volume.minSize,
+        mountOptions: volume.mountOptions,
+        mountPath: volume.mountPath,
+        snapshots: volume.snapshots,
+        target: VolumeTargets[volume.target],
+        targetDevice: volume.targetDevice?.name
       };
-
-      if (spacePolicy !== "custom") return;
-
-      return spaceActions?.map(dbusSpaceAction);
     };
 
-    const dbusVolume = (volume) => {
-      return removeUndefinedCockpitProperties({
-        MountPath: { t: "s", v: volume.mountPath },
-        FsType: { t: "s", v: volume.fsType },
-        MinSize: { t: "t", v: volume.minSize },
-        MaxSize: { t: "t", v: volume.maxSize },
-        AutoSize: { t: "b", v: volume.autoSize },
-        Target: { t: "s", v: VolumeTargets[volume.target] },
-        TargetDevice: { t: "s", v: volume.targetDevice?.name },
-        Snapshots: { t: "b", v: volume.snapshots },
-        Transactional: { t: "b", v: volume.transactional },
-      });
+    const buildHttpSettings = (settings) => {
+      return {
+        bootDevice: settings.bootDevice,
+        configureBoot: settings.configureBoot,
+        encryptionMethod: settings.encryptionMethod,
+        encryptionPBKDFunction: settings.encryptionPBKDFunction,
+        encryptionPassword: settings.encryptionPassword,
+        spaceActions: settings.spacePolicy === "custom" ? settings.spaceActions : undefined,
+        spacePolicy: settings.spacePolicy,
+        target: ProposalTargets[settings.target],
+        targetDevice: settings.targetDevice,
+        targetPVDevices: settings.targetPVDevices,
+        volumes: settings.volumes?.map(buildHttpVolume)
+      };
     };
 
-    const dbusSettings = removeUndefinedCockpitProperties({
-      Target: { t: "s", v: ProposalTargets[target] },
-      TargetDevice: { t: "s", v: targetDevice },
-      TargetPVDevices: { t: "as", v: targetPVDevices },
-      ConfigureBoot: { t: "b", v: configureBoot },
-      BootDevice: { t: "s", v: bootDevice },
-      EncryptionPassword: { t: "s", v: encryptionPassword },
-      EncryptionMethod: { t: "s", v: encryptionMethod },
-      SpacePolicy: { t: "s", v: spacePolicy },
-      SpaceActions: { t: "aa{sv}", v: dbusSpaceActions() },
-      Volumes: { t: "aa{sv}", v: volumes?.map(dbusVolume) }
-    });
+    /** @fixe Define HttpSettings type */
+    /** @type {object} */
+    const httpSettings = buildHttpSettings(settings);
+    const response = await this.client.put("/storage/proposal/settings", httpSettings);
 
-    const proxy = await this.proxies.proposalCalculator;
-    return proxy.Calculate(dbusSettings);
+    if (!response.ok) {
+      console.warn("Failed to set the proposal settings: ", response);
+      return false;
+    }
+
+    if (!response.json) {
+      console.warn("A proposal cannot be calculated with the given settings: ", response);
+      return false;
+    }
+
+    return response.json();
   }
 
   /**
    * @private
    * Builds a volume from the D-Bus data
    *
-   * @param {DBusVolume} dbusVolume
-   *
-   * @typedef {Object} DBusVolume
-   * @property {CockpitString} Target
-   * @property {CockpitString} [TargetDevice]
-   * @property {CockpitString} MountPath
-   * @property {CockpitString} FsType
-   * @property {CockpitNumber} MinSize
-   * @property {CockpitNumber} [MaxSize]
-   * @property {CockpitBoolean} AutoSize
-   * @property {CockpitBoolean} Snapshots
-   * @property {CockpitBoolean} Transactional
-   * @property {CockpitString} Target
-   * @property {CockpitString} [TargetDevice]
-   * @property {CockpitVolumeOutline} Outline
-   *
-   * @typedef {Object} DBusVolumeOutline
-   * @property {CockpitBoolean} Required
-   * @property {CockpitAString} FsTypes
-   * @property {CockpitBoolean} SupportAutoSize
-   * @property {CockpitBoolean} SnapshotsConfigurable
-   * @property {CockpitBoolean} SnapshotsAffectSizes
-   * @property {CockpitAString} SizeRelevantVolumes
-   *
-   * @typedef {Object} CockpitString
-   * @property {string} t - variant type
-   * @property {string} v - value
-   *
-   * @typedef {Object} CockpitBoolean
-   * @property {string} t - variant type
-   * @property {boolean} v - value
-   *
-   * @typedef {Object} CockpitNumber
-   * @property {string} t - variant type
-   * @property {Number} v - value
-   *
-   * @typedef {Object} CockpitAString
-   * @property {string} t - variant type
-   * @property {string[]} v - value
-   *
-   * @typedef {Object} CockpitVolumeOutline
-   * @property {string} t - variant type
-   * @property {DBusVolumeOutline} v - value
+   * @param {object} rawVolume
+   * @param {StorageDevice[]} devices
+   * @param {string[]} productMountPoints
    *
    * @returns {Volume}
    */
-  buildVolume(dbusVolume, devices) {
+  buildVolume(rawVolume, devices, productMountPoints) {
     /**
      * Builds a volume target from a D-Bus value.
      *
-     * @param {string} dbusTarget
+     * @param {string} value
      * @returns {VolumeTarget}
      */
-    const buildTarget = (dbusTarget) => {
-      switch (dbusTarget) {
+    const buildTarget = (value) => {
+      switch (value) {
         case "default": return "DEFAULT";
         case "new_partition": return "NEW_PARTITION";
         case "new_vg": return "NEW_VG";
         case "device": return "DEVICE";
         case "filesystem": return "FILESYSTEM";
         default:
-          console.info(`Unknown volume target "${dbusTarget}", using "default".`);
+          console.info(`Unknown volume target "${value}", using "default".`);
           return "DEFAULT";
       }
     };
 
-    const buildOutline = (dbusOutline) => {
-      if (dbusOutline === undefined) return null;
-
-      return {
-        required: dbusOutline.Required.v,
-        fsTypes: dbusOutline.FsTypes.v.map(val => val.v),
-        supportAutoSize: dbusOutline.SupportAutoSize.v,
-        adjustByRam: dbusOutline.AdjustByRam.v,
-        snapshotsConfigurable: dbusOutline.SnapshotsConfigurable.v,
-        snapshotsAffectSizes: dbusOutline.SnapshotsAffectSizes.v,
-        sizeRelevantVolumes: dbusOutline.SizeRelevantVolumes.v.map(val => val.v)
-      };
+    const volume = {
+      ...rawVolume,
+      target: buildTarget(rawVolume.target),
+      targetDevice: devices.find(d => d.name === rawVolume.targetDevice)
     };
 
-    return {
-      target: buildTarget(dbusVolume.Target.v),
-      targetDevice: devices.find(d => d.name === dbusVolume.TargetDevice?.v),
-      mountPath: dbusVolume.MountPath.v,
-      fsType: dbusVolume.FsType.v,
-      minSize: dbusVolume.MinSize.v,
-      maxSize: dbusVolume.MaxSize?.v,
-      autoSize: dbusVolume.AutoSize.v,
-      snapshots: dbusVolume.Snapshots.v,
-      transactional: dbusVolume.Transactional.v,
-      outline: buildOutline(dbusVolume.Outline.v)
-    };
-  }
+    // Indicate whether a volume is defined by the product.
+    volume.outline.productDefined = productMountPoints.includes(volume.mountPath);
 
-  /**
-   * @private
-   * Proxy for org.opensuse.Agama.Storage1.Proposal iface
-   *
-   * @note The proposal object implementing this iface is dynamically exported.
-   *
-   * @returns {Promise<object|null>} null if the proposal object is not exported yet
-   */
-  async proposalProxy() {
-    try {
-      return await this.client.proxy(PROPOSAL_IFACE);
-    } catch {
-      return null;
-    }
+    return volume;
   }
 }
 
@@ -1376,40 +1305,29 @@ class ZFCPManager {
  */
 class ISCSIManager {
   /**
-   * @param {string} service - D-Bus service name
-   * @param {string} address - D-Bus address
+   * @param {import("./http").HTTPClient} client - HTTP client.
    */
-  constructor(service, address) {
-    this.service = service;
-    this.address = address;
-    this.proxies = {};
+  constructor(client) {
+    this.client = client;
   }
 
   /**
-   * @return {DBusClient} client
+   * Gets the iSCSI initiator
+   *
+   * @return {Promise<ISCSIInitiator|undefined>}
+   *
+   * @typedef {object} ISCSIInitiator
+   * @property {string} name
+   * @property {boolean} ibft
    */
-  client() {
-    // return this.assigned_client;
-    if (!this._client) {
-      this._client = new DBusClient(this.service, this.address);
+  async getInitiator() {
+    const response = await this.client.get("/storage/iscsi/initiator");
+    if (!response.ok) {
+      console.error("Failed to get the iSCSI initiator", response);
+      return undefined;
     }
 
-    return this._client;
-  }
-
-  async getInitiatorIbft() {
-    const proxy = await this.iscsiInitiatorProxy();
-    return proxy.IBFT;
-  }
-
-  /**
-   * Gets the iSCSI initiator name
-   *
-   * @returns {Promise<string>}
-   */
-  async getInitiatorName() {
-    const proxy = await this.iscsiInitiatorProxy();
-    return proxy.InitiatorName;
+    return response.json();
   }
 
   /**
@@ -1417,9 +1335,8 @@ class ISCSIManager {
    *
    * @param {string} value
    */
-  async setInitiatorName(value) {
-    const proxy = await this.iscsiInitiatorProxy();
-    proxy.InitiatorName = value;
+  setInitiatorName(value) {
+    return this.client.patch("/storage/iscsi/initiator", { name: value });
   }
 
   /**
@@ -1438,8 +1355,13 @@ class ISCSIManager {
    * @property {string} startup
    */
   async getNodes() {
-    const proxy = await this.iscsiNodesProxy();
-    return Object.values(proxy).map(this.buildNode);
+    const response = await this.client.get("/storage/iscsi/nodes");
+    if (!response.ok) {
+      console.error("Failed to get the list of iSCSI nodes", response);
+      return [];
+    }
+
+    return response.json();
   }
 
   /**
@@ -1455,18 +1377,16 @@ class ISCSIManager {
    * @property {string} [reverseUsername] - Username for authentication by initiator
    * @property {string} [reversePassword] - Password for authentication by initiator
    *
-   * @returns {Promise<number>} 0 on success, 1 on failure
+   * @returns {Promise<boolean>} true on success, false on failure
    */
   async discover(address, port, options = {}) {
-    const auth = removeUndefinedCockpitProperties({
-      Username: { t: "s", v: options.username },
-      Password: { t: "s", v: options.password },
-      ReverseUsername: { t: "s", v: options.reverseUsername },
-      ReversePassword: { t: "s", v: options.reversePassword }
-    });
-
-    const proxy = await this.iscsiInitiatorProxy();
-    return proxy.Discover(address, port, auth);
+    const data = {
+      address,
+      port,
+      options,
+    };
+    const response = await this.client.post("/storage/iscsi/discover", data);
+    return response.ok;
   }
 
   /**
@@ -1475,25 +1395,21 @@ class ISCSIManager {
    * @param {ISCSINode} node
    * @param {String} startup
    */
-  async setStartup(node, startup) {
-    const path = this.nodePath(node);
-
-    const proxy = await this.client().proxy(ISCSI_NODE_IFACE, path);
-    proxy.Startup = startup;
+  setStartup(node, startup) {
+    this.client.patch(this.nodePath(node), { startup });
   }
 
   /**
    * Deletes the given iSCSI node
    *
    * @param {ISCSINode} node
-   * @returns {Promise<number>} 0 on success, 1 on failure if the given path is not exported, 2 on
+   * @returns {Promise<boolean>} 0 on success, 1 on failure if the given path is not exported, 2 on
    *  failure because any other reason.
    */
   async delete(node) {
-    const path = this.nodePath(node);
-
-    const proxy = await this.iscsiInitiatorProxy();
-    return proxy.Delete(path);
+    // FIXME: return the proper error code
+    const response = await this.client.delete(this.nodePath(node));
+    return response.ok;
   }
 
   /**
@@ -1513,63 +1429,87 @@ class ISCSIManager {
    *  valid, and 2 on failure because any other reason
    */
   async login(node, options = {}) {
-    const path = this.nodePath(node);
+    const path = this.nodePath(node) + "/login";
+    const response = await this.client.post(path, options);
+    if (!response.ok) {
+      const reason = await response.json();
+      console.warn("Could not login into the iSCSI node", reason);
+      return reason === "InvalidStartup" ? 1 : 2;
+    }
 
-    const dbusOptions = removeUndefinedCockpitProperties({
-      Username: { t: "s", v: options.username },
-      Password: { t: "s", v: options.password },
-      ReverseUsername: { t: "s", v: options.reverseUsername },
-      ReversePassword: { t: "s", v: options.reversePassword },
-      Startup: { t: "s", v: options.startup }
-    });
-
-    const proxy = await this.client().proxy(ISCSI_NODE_IFACE, path);
-    return proxy.Login(dbusOptions);
+    return 0;
   }
 
   /**
    * Closes an iSCSI session
    *
    * @param {ISCSINode} node
-   * @returns {Promise<number>} 0 on success, 1 on failure
+   * @returns {Promise<boolean>} true on success, false on failure
    */
   async logout(node) {
-    const path = this.nodePath(node);
-    // const iscsiNode = new ISCSINodeObject(this.client, path);
-    // return await iscsiNode.iface.logout();
-    const proxy = await this.client().proxy(ISCSI_NODE_IFACE, path);
-    return proxy.Logout();
+    const path = this.nodePath(node) + "/logout";
+    const response = await this.client.post(path);
+    if (!response.ok) {
+      console.error("Could not logout from the iSCSI node", response);
+      return false;
+    }
+
+    return true;
   }
 
+  /**
+   * Registers a callback for initiator changes.
+   *
+   * @param {(event: object) => void} handler - Callback.
+   */
   onInitiatorChanged(handler) {
-    return this.client().onObjectChanged(STORAGE_OBJECT, ISCSI_INITIATOR_IFACE, (changes) => {
-      const data = {
-        name: changes.InitiatorName?.v,
-        ibft: changes.IBFT?.v
-      };
-
-      const filtered = Object.entries(data).filter(([, v]) => v !== undefined);
-      return handler(Object.fromEntries(filtered));
-    });
+    return this.client.onEvent("ISCSIInitiatorChanged", handler);
   }
 
-  async onNodeAdded(handler) {
-    const proxy = await this.iscsiNodesProxy();
-    proxy.addEventListener("added", (_, proxy) => handler(this.buildNode(proxy)));
+  /**
+   * Registers a callback to run when an iSCSI node appears.
+   *
+   * @param {(node: ISCSINode) => void} handler - callback which receives the
+   *   ISCSINode object.
+   */
+  onNodeAdded(handler) {
+    return this.onNodeEvent("ISCSINodeAdded", handler);
   }
 
-  async onNodeChanged(handler) {
-    const proxy = await this.iscsiNodesProxy();
-    proxy.addEventListener("changed", (_, proxy) => handler(this.buildNode(proxy)));
+  /**
+   * Registers a callback to run when an iSCSI node changes.
+   *
+   * @param {(node: ISCSINode) => void} handler - callback which receives the
+   *   ISCSINode object.
+   */
+  onNodeChanged(handler) {
+    return this.onNodeEvent("ISCSINodeChanged", handler);
   }
 
-  async onNodeRemoved(handler) {
-    const proxy = await this.iscsiNodesProxy();
-    proxy.addEventListener("removed", (_, proxy) => handler(this.buildNode(proxy)));
+  /**
+   * Registers a callback to run when an iSCSI node disappears.
+   *
+   * @param {(node: ISCSINode) => void} handler - callback which receives the
+   *   ISCSINode object.
+   */
+  onNodeRemoved(handler) {
+    return this.onNodeEvent("ISCSINodeRemoved", handler);
+  }
+
+  /**
+   * @private
+   * Registers a handler for the given iSCSI node event.
+   *
+   * @param {string} eventName - Event name.
+   * @param {(node: ISCSINode) => void} handler - callback which receives the
+   *   ISCSINode object.
+   */
+  onNodeEvent(eventName, handler) {
+    return this.client.onEvent(eventName, ({ node }) => handler(node));
   }
 
   buildNode(proxy) {
-    const id = path => path.split("/").slice(-1)[0];
+    const id = (path) => path.split("/").slice(-1)[0];
 
     return {
       id: id(proxy.path),
@@ -1579,37 +1519,8 @@ class ISCSIManager {
       interface: proxy.Interface,
       ibft: proxy.IBFT,
       connected: proxy.Connected,
-      startup: proxy.Startup
+      startup: proxy.Startup,
     };
-  }
-
-  /**
-   * @private
-   * Proxy for org.opensuse.Agama.Storage1.ISCSI.Initiator iface
-   *
-   * @returns {Promise<object>}
-   */
-  async iscsiInitiatorProxy() {
-    if (!this.proxies.iscsiInitiator) {
-      this.proxies.iscsiInitiator = await this.client().proxy(ISCSI_INITIATOR_IFACE, STORAGE_OBJECT);
-    }
-
-    return this.proxies.iscsiInitiator;
-  }
-
-  /**
-   * @private
-   * Proxy for objects implementing org.opensuse.Agama.Storage1.ISCSI.Node iface
-   *
-   * @note The ISCSI nodes are dynamically exported.
-   *
-   * @returns {Promise<object>}
-   */
-  async iscsiNodesProxy() {
-    if (!this.proxies.iscsiNodes)
-      this.proxies.iscsiNodes = await this.client().proxies(ISCSI_NODE_IFACE, ISCSI_NODES_NAMESPACE);
-
-    return this.proxies.iscsiNodes;
   }
 
   /**
@@ -1633,27 +1544,27 @@ class StorageBaseClient {
   static SERVICE = "org.opensuse.Agama.Storage1";
 
   /**
-   * @param {string|undefined} address - D-Bus address; if it is undefined, it uses the system bus.
+   * @param {import("./http").HTTPClient} client - HTTP client.
    */
-  constructor(address = undefined) {
-    this.client = new DBusClient(StorageBaseClient.SERVICE, address);
-    this.system = new DevicesManager(this.client, STORAGE_SYSTEM_NAMESPACE);
-    this.staging = new DevicesManager(this.client, STORAGE_STAGING_NAMESPACE);
+  constructor(client = undefined) {
+    this.client = client;
+    this.system = new DevicesManager(this.client, "system");
+    this.staging = new DevicesManager(this.client, "result");
     this.proposal = new ProposalManager(this.client, this.system);
-    this.iscsi = new ISCSIManager(StorageBaseClient.SERVICE, address);
-    this.dasd = new DASDManager(StorageBaseClient.SERVICE, address);
-    this.zfcp = new ZFCPManager(StorageBaseClient.SERVICE, address);
-    this.proxies = {
-      storage: this.client.proxy(STORAGE_IFACE)
-    };
+    this.iscsi = new ISCSIManager(this.client);
+    this.dasd = new DASDManager(StorageBaseClient.SERVICE, client);
+    this.zfcp = new ZFCPManager(StorageBaseClient.SERVICE, client);
   }
 
   /**
    * Probes the system
    */
   async probe() {
-    const proxy = await this.proxies.storage;
-    return proxy.Probe();
+    const response = await this.client.post("/storage/probe");
+
+    if (!response.ok) {
+      console.warn("Failed to probe the storage setup: ", response);
+    }
   }
 
   /**
@@ -1662,8 +1573,12 @@ class StorageBaseClient {
    * @returns {Promise<boolean>}
    */
   async isDeprecated() {
-    const proxy = await this.proxies.storage;
-    return proxy.DeprecatedSystem;
+    const response = await this.client.get("/storage/devices/dirty");
+    if (!response.ok) {
+      console.warn("Failed to get storage devices dirty: ", response);
+      return false;
+    }
+    return response.json();
   }
 
   /**
@@ -1675,8 +1590,10 @@ class StorageBaseClient {
    * @param {handlerFn} handler
    */
   onDeprecate(handler) {
-    return this.client.onObjectChanged(STORAGE_OBJECT, STORAGE_IFACE, (changes) => {
-      if (changes.DeprecatedSystem?.v) return handler();
+    return this.client.onEvent("DevicesDirty", ({ value }) => {
+      if (value) {
+        handler();
+      }
     });
   }
 }
@@ -1686,8 +1603,8 @@ class StorageBaseClient {
  */
 class StorageClient extends WithIssues(
   WithProgress(
-    WithStatus(StorageBaseClient, STORAGE_OBJECT), STORAGE_OBJECT
-  ), STORAGE_OBJECT
+    WithStatus(StorageBaseClient, "/storage/status", SERVICE_NAME), "/storage/progress", SERVICE_NAME
+  ), "/storage/issues", SERVICE_NAME
 ) { }
 
 export { StorageClient, EncryptionMethods };

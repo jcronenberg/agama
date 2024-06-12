@@ -71,17 +71,30 @@ pub fn connection_to_dbus<'a>(
     result.insert("match", match_config_to_dbus(&conn.match_config));
 
     if conn.is_ethernet() {
-        let ethernet_config = HashMap::from([(
-            "assigned-mac-address",
-            Value::new(conn.mac_address.to_string()),
-        )]);
+        let ethernet_config = HashMap::from([
+            (
+                "assigned-mac-address",
+                Value::new(conn.mac_address.to_string()),
+            ),
+            ("mtu", Value::new(conn.mtu)),
+        ]);
         result.insert(ETHERNET_KEY, ethernet_config);
     }
 
     match &conn.config {
         ConnectionConfig::Wireless(wireless) => {
             connection_dbus.insert("type", WIRELESS_KEY.into());
-            let wireless_dbus = wireless_config_to_dbus(wireless, &conn.mac_address);
+            let mut wireless_dbus = wireless_config_to_dbus(wireless);
+            if let Some(wireless_dbus_key) = wireless_dbus.get_mut(WIRELESS_KEY) {
+                wireless_dbus_key.extend(HashMap::from([
+                    ("mtu", Value::new(conn.mtu)),
+                    (
+                        "assigned-mac-address",
+                        Value::new(conn.mac_address.to_string()),
+                    ),
+                ]));
+            }
+
             result.extend(wireless_dbus);
         }
         ConnectionConfig::Bond(bond) => {
@@ -155,17 +168,17 @@ pub fn connection_from_dbus(conn: OwnedNestedHash) -> Option<Connection> {
         return Some(connection);
     }
 
-    if conn.get(DUMMY_KEY).is_some() {
+    if conn.contains_key(DUMMY_KEY) {
         connection.config = ConnectionConfig::Dummy;
         return Some(connection);
     };
 
-    if conn.get(LOOPBACK_KEY).is_some() {
+    if conn.contains_key(LOOPBACK_KEY) {
         connection.config = ConnectionConfig::Loopback;
         return Some(connection);
     };
 
-    if conn.get(ETHERNET_KEY).is_some() {
+    if conn.contains_key(ETHERNET_KEY) {
         return Some(connection);
     };
 
@@ -240,9 +253,7 @@ pub fn cleanup_dbus_connection(conn: &mut NestedHash) {
 
 /// Ancillary function to get the controller for a given interface.
 pub fn controller_from_dbus(conn: &OwnedNestedHash) -> Option<String> {
-    let Some(connection) = conn.get("connection") else {
-        return None;
-    };
+    let connection = conn.get("connection")?;
 
     let master: &str = connection.get("master")?.downcast_ref()?;
     Some(master.to_string())
@@ -338,14 +349,10 @@ fn ip_config_to_ipv6_dbus(ip_config: &IpConfig) -> HashMap<&str, zvariant::Value
     ipv6_dbus
 }
 
-fn wireless_config_to_dbus<'a>(
-    config: &'a WirelessConfig,
-    mac_address: &MacAddress,
-) -> NestedHash<'a> {
+fn wireless_config_to_dbus<'a>(config: &'a WirelessConfig) -> NestedHash<'a> {
     let mut wireless: HashMap<&str, zvariant::Value> = HashMap::from([
         ("mode", Value::new(config.mode.to_string())),
         ("ssid", Value::new(config.ssid.to_vec())),
-        ("assigned-mac-address", Value::new(mac_address.to_string())),
         ("hidden", Value::new(config.hidden)),
     ]);
 
@@ -424,13 +431,9 @@ fn bridge_config_to_dbus(bridge: &BridgeConfig) -> HashMap<&str, zvariant::Value
 }
 
 fn bridge_config_from_dbus(conn: &OwnedNestedHash) -> Option<BridgeConfig> {
-    let Some(bridge) = conn.get(BRIDGE_KEY) else {
-        return None;
-    };
+    let bridge = conn.get(BRIDGE_KEY)?;
 
-    let Some(stp) = bridge.get("stp") else {
-        return None;
-    };
+    let stp = bridge.get("stp")?;
 
     let mut bc = BridgeConfig {
         stp: *stp.downcast_ref::<bool>()?,
@@ -474,9 +477,7 @@ fn bridge_port_config_to_dbus(bridge_port: &BridgePortConfig) -> HashMap<&str, z
 }
 
 fn bridge_port_config_from_dbus(conn: &OwnedNestedHash) -> Option<BridgePortConfig> {
-    let Some(bridge_port) = conn.get(BRIDGE_PORT_KEY) else {
-        return None;
-    };
+    let bridge_port = conn.get(BRIDGE_PORT_KEY)?;
 
     let mut bpc = BridgePortConfig::default();
 
@@ -508,9 +509,7 @@ fn infiniband_config_to_dbus(config: &InfinibandConfig) -> HashMap<&str, zvarian
 }
 
 fn infiniband_config_from_dbus(conn: &OwnedNestedHash) -> Option<InfinibandConfig> {
-    let Some(infiniband) = conn.get(INFINIBAND_KEY) else {
-        return None;
-    };
+    let infiniband = conn.get(INFINIBAND_KEY)?;
 
     let mut infiniband_config = InfinibandConfig::default();
 
@@ -551,9 +550,7 @@ fn match_config_to_dbus(match_config: &MatchConfig) -> HashMap<&str, zvariant::V
 }
 
 fn base_connection_from_dbus(conn: &OwnedNestedHash) -> Option<Connection> {
-    let Some(connection) = conn.get("connection") else {
-        return None;
-    };
+    let connection = conn.get("connection")?;
 
     let id: &str = connection.get("id")?.downcast_ref()?;
     let uuid: &str = connection.get("uuid")?.downcast_ref()?;
@@ -580,8 +577,10 @@ fn base_connection_from_dbus(conn: &OwnedNestedHash) -> Option<Connection> {
 
     if let Some(ethernet_config) = conn.get(ETHERNET_KEY) {
         base_connection.mac_address = mac_address_from_dbus(ethernet_config)?;
+        base_connection.mtu = mtu_from_dbus(ethernet_config);
     } else if let Some(wireless_config) = conn.get(WIRELESS_KEY) {
         base_connection.mac_address = mac_address_from_dbus(wireless_config)?;
+        base_connection.mtu = mtu_from_dbus(wireless_config);
     }
 
     base_connection.ip_config = ip_config_from_dbus(conn)?;
@@ -600,6 +599,14 @@ fn mac_address_from_dbus(config: &HashMap<String, OwnedValue>) -> Option<MacAddr
         }
     } else {
         Some(MacAddress::Unset)
+    }
+}
+
+fn mtu_from_dbus(config: &HashMap<String, OwnedValue>) -> u32 {
+    if let Some(mtu) = config.get("mtu") {
+        *mtu.downcast_ref::<u32>().unwrap_or(&0)
+    } else {
+        0
     }
 }
 
@@ -751,9 +758,7 @@ fn nameservers_from_dbus(dns_data: &OwnedValue) -> Option<Vec<IpAddr>> {
 }
 
 fn wireless_config_from_dbus(conn: &OwnedNestedHash) -> Option<WirelessConfig> {
-    let Some(wireless) = conn.get(WIRELESS_KEY) else {
-        return None;
-    };
+    let wireless = conn.get(WIRELESS_KEY)?;
 
     let mode: &str = wireless.get("mode")?.downcast_ref()?;
     let ssid = wireless.get("ssid")?;
@@ -799,34 +804,40 @@ fn wireless_config_from_dbus(conn: &OwnedNestedHash) -> Option<WirelessConfig> {
     if let Some(security) = conn.get(WIRELESS_SECURITY_KEY) {
         let key_mgmt: &str = security.get("key-mgmt")?.downcast_ref()?;
         wireless_config.security = NmKeyManagement(key_mgmt.to_string()).try_into().ok()?;
+        if let Some(password) = security.get("psk") {
+            wireless_config.password = Some(password.to_string());
+        }
 
-        let wep_key_type = security
-            .get("wep-key-type")
-            .and_then(|alg| WEPKeyType::try_from(*alg.downcast_ref::<u32>()?).ok())
-            .unwrap_or_default();
-        let auth_alg = security
-            .get("auth-alg")
-            .and_then(|alg| WEPAuthAlg::try_from(alg.downcast_ref()?).ok())
-            .unwrap_or_default();
-        let wep_key_index = security
-            .get("wep-tx-keyidx")
-            .and_then(|idx| idx.downcast_ref::<u32>().cloned())
-            .unwrap_or_default();
-        wireless_config.wep_security = Some(WEPSecurity {
-            wep_key_type,
-            auth_alg,
-            wep_key_index,
-            ..Default::default()
-        });
+        match wireless_config.security {
+            SecurityProtocol::WEP => {
+                let wep_key_type = security
+                    .get("wep-key-type")
+                    .and_then(|alg| WEPKeyType::try_from(*alg.downcast_ref::<u32>()?).ok())
+                    .unwrap_or_default();
+                let auth_alg = security
+                    .get("auth-alg")
+                    .and_then(|alg| WEPAuthAlg::try_from(alg.downcast_ref()?).ok())
+                    .unwrap_or_default();
+                let wep_key_index = security
+                    .get("wep-tx-keyidx")
+                    .and_then(|idx| idx.downcast_ref::<u32>().cloned())
+                    .unwrap_or_default();
+                wireless_config.wep_security = Some(WEPSecurity {
+                    wep_key_type,
+                    auth_alg,
+                    wep_key_index,
+                    ..Default::default()
+                });
+            }
+            _ => wireless_config.wep_security = None,
+        }
     }
 
     Some(wireless_config)
 }
 
 fn bond_config_from_dbus(conn: &OwnedNestedHash) -> Option<BondConfig> {
-    let Some(bond) = conn.get(BOND_KEY) else {
-        return None;
-    };
+    let bond = conn.get(BOND_KEY)?;
 
     let dict: &zvariant::Dict = bond.get("options")?.downcast_ref()?;
 
@@ -856,18 +867,12 @@ fn vlan_config_to_dbus(cfg: &VlanConfig) -> NestedHash {
 }
 
 fn vlan_config_from_dbus(conn: &OwnedNestedHash) -> Option<VlanConfig> {
-    let Some(vlan) = conn.get(VLAN_KEY) else {
-        return None;
-    };
+    let vlan = conn.get(VLAN_KEY)?;
 
-    let Some(id) = vlan.get("id") else {
-        return None;
-    };
+    let id = vlan.get("id")?;
     let id = id.downcast_ref::<u32>()?;
 
-    let Some(parent) = vlan.get("parent") else {
-        return None;
-    };
+    let parent = vlan.get("parent")?;
     let parent: &str = parent.downcast_ref()?;
 
     let protocol = match vlan.get("protocol") {
@@ -1009,6 +1014,8 @@ mod test {
 
         assert_eq!(connection.mac_address.to_string(), "12:34:56:78:9A:BC");
 
+        assert_eq!(connection.mtu, 9000_u32);
+
         assert_eq!(
             ip_config.addresses,
             vec![
@@ -1107,10 +1114,7 @@ mod test {
                 Some(macaddr::MacAddr6::from_str("12:34:56:78:9A:BC").unwrap())
             );
             assert!(!wireless.hidden);
-            let wep_security = wireless.wep_security.as_ref().unwrap();
-            assert_eq!(wep_security.wep_key_type, WEPKeyType::Key);
-            assert_eq!(wep_security.auth_alg, WEPAuthAlg::Open);
-            assert_eq!(wep_security.wep_key_index, 1);
+            assert_eq!(wireless.wep_security, None);
         }
     }
 
@@ -1147,7 +1151,7 @@ mod test {
         ]);
 
         let infiniband_section = HashMap::from([
-            ("p-key".to_string(), Value::new(0x8001 as i32).to_owned()),
+            ("p-key".to_string(), Value::new(0x8001_i32).to_owned()),
             ("parent".to_string(), Value::new("ib0").to_owned()),
             (
                 "transport-mode".to_string(),
@@ -1396,10 +1400,13 @@ mod test {
                 Value::new("eth0".to_string()).to_owned(),
             ),
         ]);
-        let ethernet = HashMap::from([(
-            "assigned-mac-address".to_string(),
-            Value::new("12:34:56:78:9A:BC".to_string()).to_owned(),
-        )]);
+        let ethernet = HashMap::from([
+            (
+                "assigned-mac-address".to_string(),
+                Value::new("12:34:56:78:9A:BC".to_string()).to_owned(),
+            ),
+            ("mtu".to_string(), Value::new(9000).to_owned()),
+        ]);
         original.insert("connection".to_string(), connection);
         original.insert(ETHERNET_KEY.to_string(), ethernet);
 
@@ -1415,6 +1422,7 @@ mod test {
         assert_eq!(connection.get("interface-name"), None);
         let ethernet = merged.get(ETHERNET_KEY).unwrap();
         assert_eq!(ethernet.get("assigned-mac-address"), Some(&Value::from("")));
+        assert_eq!(ethernet.get("mtu"), Some(&Value::from(0_u32)));
     }
 
     fn build_ethernet_section_from_dbus() -> HashMap<String, OwnedValue> {
@@ -1424,6 +1432,7 @@ mod test {
                 "assigned-mac-address".to_string(),
                 Value::new("12:34:56:78:9A:BC").to_owned(),
             ),
+            ("mtu".to_string(), Value::new(9000_u32).to_owned()),
         ])
     }
 
@@ -1453,6 +1462,7 @@ mod test {
             id: "agama".to_string(),
             ip_config,
             mac_address,
+            mtu: 1500_u32,
             ..Default::default()
         }
     }
@@ -1469,6 +1479,15 @@ mod test {
             .downcast_ref()
             .unwrap();
         assert_eq!(mac_address, "FD:CB:A9:87:65:43");
+
+        assert_eq!(
+            *ethernet_connection
+                .get("mtu")
+                .unwrap()
+                .downcast_ref::<u32>()
+                .unwrap(),
+            1500_u32
+        );
 
         let ipv4_dbus = conn_dbus.get("ipv4").unwrap();
         let gateway4: &str = ipv4_dbus.get("gateway").unwrap().downcast_ref().unwrap();
