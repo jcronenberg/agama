@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Jun 24 09:15:33 UTC 2024 - Jorik Cronenberg <jorik.cronenberg@suse.com>
+
+- Add dns search domains and ignore-auto-dns to network model
+  (gh#openSUSE/agama#1330).
+
+-------------------------------------------------------------------
 Thu Jun 21 15:00:00 UTC 2024 - Clemens Famulla-Conrad <cfamullaconrad@suse.de>
 
 - Add tun/tap model (gh#openSUSE/agama#1353)
