@@ -6,6 +6,7 @@ mod migrate;
 mod reader;
 mod vlan;
 mod wireless;
+mod tuntap;
 
 use clap::builder::TypedValueParser;
 use clap::{Args, Parser, Subcommand};

@@ -3,6 +3,8 @@ use crate::bridge::Bridge;
 use crate::infiniband::{Infiniband, InfinibandChild};
 use crate::vlan::Vlan;
 use crate::wireless::Wireless;
+use crate::tuntap::Tun;
+use crate::tuntap::Tap;
 use crate::MIGRATION_SETTINGS;
 use agama_lib::network::types::Status;
 use agama_server::network::model::{self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress};
@@ -40,6 +42,8 @@ pub struct Interface {
     pub infiniband: Option<Infiniband>,
     #[serde(rename = "infiniband-child")]
     pub infiniband_child: Option<InfinibandChild>,
+    pub tun: Option<Tun>,
+    pub tap: Option<Tap>,
 }
 
 #[skip_serializing_none]
@@ -211,6 +215,12 @@ impl Interface {
                 ));
             }
             connection.config = infiniband_child.into();
+            connections.push(connection)
+        } else if let Some(tun) = &self.tun {
+            connection.config = tun.into();
+            connections.push(connection)
+        } else if let Some(tap) = &self.tap {
+            connection.config = tap.into();
             connections.push(connection)
         } else {
             connections.push(connection);
