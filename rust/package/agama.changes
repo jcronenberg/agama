@@ -1,4 +1,65 @@
 -------------------------------------------------------------------
+Wed Jun 26 10:29:05 UTC 2024 - José Iván López González <jlopez@suse.com>
+
+- Set and get storage config (gh#openSUSE/agama#1293).
+
+-------------------------------------------------------------------
+Tue Jun 25 15:16:33 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Use the new SetLocale D-Bus method to change the language and the
+  keyboard layout (gh#openSUSE/agama#1375).
+
+-------------------------------------------------------------------
+Tue Jun 25 15:04:20 UTC 2024 - David Diaz <dgonzalez@suse.com>
+
+- Add resize actions to storage model (gh#openSUSE/agama#1354).
+
+-------------------------------------------------------------------
+Thu Jun 21 15:00:00 UTC 2024 - Clemens Famulla-Conrad <cfamullaconrad@suse.de>
+
+- Add tun/tap model (gh#openSUSE/agama#1353)
+
+-------------------------------------------------------------------
+Thu Jun 20 12:58:32 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Add a new "config edit" command allows editing installation
+  settings using an external editor (gh#openSUSE/agama#1360).
+- Remove the "--format" option (gh#openSUSE/agama#1360).
+
+-------------------------------------------------------------------
+Thu Jun 20 05:32:42 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Add support for progress sequences with pre-defined descriptions
+  (gh#openSUSE/agama#1356).
+- Fix the "Progress" signal to use camelCase
+  (gh#openSUSE/agama#1356).
+
+-------------------------------------------------------------------
+Fri Jun 14 06:17:52 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Remove references to the old "config add/set" subcommands
+  (gh#openSUSE/agama/#1338).
+
+-------------------------------------------------------------------
+Thu Jun 13 10:50:44 UTC 2024 - Knut Anderssen <kanderssen@suse.com>
+
+- Apply network changes when connecting or disconnecting
+  (gh#openSUSE/agama#1320).
+
+-------------------------------------------------------------------
+Thu Jun 13 10:39:57 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
+
+- Expose Issues API in users-related interface
+  (gh#openSUSE/agama#1202).
+- Drop the old validations API.
+
+-------------------------------------------------------------------
+Wed Jun 12 10:15:33 UTC 2024 - Jorik Cronenberg <jorik.cronenberg@suse.com>
+
+- Allow writing to loopback connection in agama-server
+  (gh#openSUSE/agama#1318).
+
+-------------------------------------------------------------------
 Tue Jun 11 21:35:00 UTC 2024 - Imobach Gonzalez Sosa <igonzalezsosa@suse.com>
 
 - CLI: use the master token /run/agama/token if available and

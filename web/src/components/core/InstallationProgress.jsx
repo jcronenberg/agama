@@ -1,5 +1,5 @@
 /*
- * Copyright (c) [2022] SUSE LLC
+ * Copyright (c) [2022-2024] SUSE LLC
  *
  * All Rights Reserved.
  *
@@ -20,19 +20,25 @@
  */
 
 import React from "react";
-
-import ProgressReport from "./ProgressReport";
-import { Center } from "~/components/layout";
-import { Page } from "~/components/core";
-import { Questions } from "~/components/questions";
+import { useProduct } from "~/context/product";
+import { sprintf } from "sprintf-js";
 import { _ } from "~/i18n";
+import ProgressReport from "./ProgressReport";
+import SimpleLayout from "~/SimpleLayout";
 
 function InstallationProgress() {
+  const { selectedProduct } = useProduct();
+
+  if (!selectedProduct) {
+    return;
+  }
+
+  // TRANSLATORS: %s is replaced by a product name (e.g., openSUSE Tumbleweed)
+  const title = sprintf(_("Installing %s, please wait ..."), selectedProduct.name);
   return (
-    <Page icon="downloading" title={_("Installing")}>
-      <Center><ProgressReport /></Center>
-      <Questions />
-    </Page>
+    <SimpleLayout showOutlet={false}>
+      <ProgressReport title={title} />
+    </SimpleLayout>
   );
 }
 

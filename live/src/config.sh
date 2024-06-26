@@ -12,6 +12,13 @@ echo "Configure image: [$kiwi_iname]..."
 # setup baseproduct link
 suseSetupProduct
 
+# configure the repositories in the Live system
+# import the OBS key for the systemsmanagement OBS project
+rpm --import /tmp/systemsmanagement_key.gpg
+rm /tmp/systemsmanagement_key.gpg
+# import the openSUSE keys
+rpm --import /usr/lib/rpm/gnupg/keys/*.asc
+
 # activate services
 systemctl enable sshd.service
 systemctl enable NetworkManager.service
@@ -22,9 +29,11 @@ systemctl enable agama-auto.service
 systemctl enable agama-hostname.service
 systemctl enable agama-proxy-setup.service
 systemctl enable agama-certificate-issue.path
+systemctl enable agama-certificate-wait.service
 systemctl enable agama-welcome-issue.service
 systemctl enable agama-avahi-issue.service
 systemctl enable agama-ssh-issue.service
+systemctl enable agama-self-update.service
 systemctl enable live-password-cmdline.service
 systemctl enable live-password-dialog.service
 systemctl enable live-password-iso.service

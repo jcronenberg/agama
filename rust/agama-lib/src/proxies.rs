@@ -23,6 +23,10 @@ trait Progress {
     /// TotalSteps property
     #[dbus_proxy(property)]
     fn total_steps(&self) -> zbus::Result<u32>;
+
+    /// Steps property
+    #[dbus_proxy(property)]
+    fn steps(&self) -> zbus::Result<Vec<String>>;
 }
 
 #[dbus_proxy(
@@ -179,13 +183,12 @@ trait Issues {
     fn all(&self) -> zbus::Result<Vec<(String, String, u32, u32)>>;
 }
 
-#[dbus_proxy(interface = "org.opensuse.Agama1.Validation", assume_defaults = true)]
-trait Validation {
-    /// Errors property
-    #[dbus_proxy(property)]
-    fn errors(&self) -> zbus::Result<Vec<String>>;
-
-    /// Valid property
-    #[dbus_proxy(property)]
-    fn valid(&self) -> zbus::Result<bool>;
+#[dbus_proxy(
+    interface = "org.opensuse.Agama1.Locale",
+    default_service = "org.opensuse.Agama.Manager1",
+    default_path = "/org/opensuse/Agama/Manager1"
+)]
+trait Locale {
+    /// SetLocale method
+    fn set_locale(&self, locale: &str) -> zbus::Result<()>;
 }

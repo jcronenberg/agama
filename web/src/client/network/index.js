@@ -123,7 +123,7 @@ class NetworkClient {
     const { ipConfig = {}, ...dev } = device;
     const routes4 = (ipConfig.routes4 || []).map((route) => {
       const [ip, netmask] = route.destination.split("/");
-      const destination = { address: ip, prefix: ipPrefixFor(netmask) };
+      const destination = (netmask !== undefined) ? { address: ip, prefix: ipPrefixFor(netmask) } : { address: ip };
 
       return { ...route, destination };
     });
@@ -225,7 +225,7 @@ class NetworkClient {
    * @param {Connection} connection - connection to be activated
    */
   async connectTo(connection) {
-    return this.client.get(`/network/${connection.id}/connect`);
+    return this.client.get(`/network/connections/${connection.id}/connect`);
   }
 
   /**
@@ -234,7 +234,39 @@ class NetworkClient {
    * @param {Connection} connection - connection to be activated
    */
   async disconnect(connection) {
-    return this.client.get(`/network/${connection.id}/disconnect`);
+    return this.client.get(`/network/connections/${connection.id}/disconnect`);
+  }
+
+  async loadNetworks(devices, connections, accessPoints) {
+    const knownSsids = [];
+
+    return accessPoints
+      .sort((a, b) => b.strength - a.strength)
+      .reduce((networks, ap) => {
+        // Do not include networks without SSID
+        if (!ap.ssid || ap.ssid === "") return networks;
+        // Do not include "duplicates"
+        if (knownSsids.includes(ap.ssid)) return networks;
+
+        const network = {
+          ...ap,
+          settings: connections.find(c => c.wireless?.ssid === ap.ssid),
+          device: devices.find(c => c.connection === ap.ssid)
+        };
+
+        // Group networks
+        if (network.device) {
+          networks.connected.push(network);
+        } else if (network.settings) {
+          networks.configured.push(network);
+        } else {
+          networks.others.push(network);
+        }
+
+        knownSsids.push(network.ssid);
+
+        return networks;
+      }, { connected: [], configured: [], others: [] });
   }
 
   /**

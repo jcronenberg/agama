@@ -177,6 +177,15 @@ const WithStatus = (superclass, status_path, service_name) =>
  */
 
 /**
+ * @typedef {object} ProgressSequence
+ * @property {string[]} steps - sequence steps if known in advance
+ * @property {number} total - number of steps
+ * @property {number} current - current step
+ * @property {string} message - message of the current step
+ * @property {boolean} finished - whether the progress already finished
+ */
+
+/**
  * @callback ProgressHandler
  * @param {Progress} progress - progress status
  * @return {void}
@@ -195,7 +204,7 @@ const WithProgress = (superclass, progress_path, service_name) =>
     /**
      * Returns the service progress
      *
-     * @return {Promise<Progress>} an object containing the total steps,
+     * @return {Promise<ProgressSequence>} an object containing the total steps,
      *   the current step and whether the service finished or not.
      */
     async getProgress() {
@@ -203,17 +212,20 @@ const WithProgress = (superclass, progress_path, service_name) =>
       if (!response.ok) {
         console.log("get progress failed with:", response);
         return {
+          steps: [],
           total: 0,
           current: 0,
           message: "Failed to get progress",
           finished: false,
         };
       } else {
-        const { current_step, max_steps, current_title, finished } = await response.json();
+        const { steps, currentStep, maxSteps, currentTitle, finished } =
+          await response.json();
         return {
-          total: max_steps,
-          current: current_step,
-          message: current_title,
+          steps,
+          total: maxSteps,
+          current: currentStep,
+          message: currentTitle,
           finished,
         };
       }
@@ -228,11 +240,11 @@ const WithProgress = (superclass, progress_path, service_name) =>
     onProgressChange(handler) {
       return this.client.onEvent("Progress", ({ service, ...progress }) => {
         if (service === service_name) {
-          const { current_step, max_steps, current_title, finished } = progress;
+          const { currentStep, maxSteps, currentTitle, finished } = progress;
           handler({
-            total: max_steps,
-            current: current_step,
-            message: current_title,
+            total: maxSteps,
+            current: currentStep,
+            message: currentTitle,
             finished,
           });
         }
@@ -254,50 +266,8 @@ const WithProgress = (superclass, progress_path, service_name) =>
 /**
  * @param {string} message - Error message
  */
-const createError = (message) => {
+const createError = message => {
   return { message };
 };
 
-/**
- * Extends the given class with methods to get validation errors over D-Bus
- * @template {!WithHTTPClient} T
- * @param {T} superclass - superclass to extend
- * @param {string} validation_path - status resource path (e.g., "/manager/status").
- * @param {string} service_name - service name (e.g., "org.opensuse.Agama.Manager1").
- */
-const WithValidation = (superclass, validation_path, service_name) =>
-  class extends superclass {
-    /**
-     * Returns the validation errors
-     *
-     * @return {Promise<ValidationError[]>}
-     */
-    async getValidationErrors() {
-      const response = await this.client.get(validation_path);
-      if (!response.ok) {
-        console.log("get validation failed with:", response);
-        return [{
-          message: "Failed to validate",
-        }];
-      } else {
-        const data = await response.json();
-        return data.errors.map(createError);
-      }
-    }
-
-    /**
-     * Register a callback to run when the validation changes
-     *
-     * @param {ValidationErrorsHandler} handler - callback function
-     * @return {import ("./dbus").RemoveFn} function to disable the callback
-     */
-    onValidationChange(handler) {
-      return this.client.onEvent("ValidationChange", ({ service, errors }) => {
-        if (service === service_name) {
-          handler(errors);
-        }
-      });
-    }
-  };
-
-export { WithIssues, WithProgress, WithStatus, WithValidation };
+export { WithIssues, WithProgress, WithStatus };

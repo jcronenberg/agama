@@ -23,6 +23,7 @@ require "yast"
 require "agama/config"
 require "agama/network"
 require "agama/proxy_setup"
+require "agama/with_locale"
 require "agama/with_progress"
 require "agama/installation_phase"
 require "agama/service_status_recorder"
@@ -43,6 +44,7 @@ module Agama
   # other services via D-Bus (e.g., `org.opensuse.Agama.Software1`).
   class Manager
     include WithProgress
+    include WithLocale
     include Helpers
     include Yast::I18n
 
@@ -79,14 +81,30 @@ module Agama
       service_status.idle
     end
 
+    def locale=(locale)
+      service_status.busy
+      change_process_locale(locale)
+      start_progress_with_descriptions(
+        _("Load software translations"),
+        _("Load storage translations")
+      )
+      progress.step { software.locale = locale }
+      progress.step { storage.locale = locale }
+    ensure
+      service_status.idle
+      finish_progress
+    end
+
     # Runs the config phase
     def config_phase
       service_status.busy
       installation_phase.config
 
-      start_progress(2)
-      progress.step(_("Probing Storage")) { storage.probe }
-      progress.step(_("Probing Software")) { software.probe }
+      start_progress_with_descriptions(
+        _("Analyze disks"), _("Configure software")
+      )
+      progress.step { storage.probe }
+      progress.step { software.probe }
 
       logger.info("Config phase done")
     rescue StandardError => e
@@ -102,11 +120,15 @@ module Agama
     def install_phase
       service_status.busy
       installation_phase.install
-      start_progress(7)
+      start_progress_with_descriptions(
+        _("Prepare disks"),
+        _("Install software"),
+        _("Configure the system")
+      )
 
       Yast::Installation.destdir = "/mnt"
 
-      progress.step(_("Partitioning")) do
+      progress.step do
         storage.install
         proxy.propose
         # propose software after /mnt is already separated, so it uses proper
@@ -114,14 +136,15 @@ module Agama
         software.propose
       end
 
-      progress.step(_("Installing Software")) { software.install }
-
-      on_target do
-        progress.step(_("Writing Users")) { users.write }
-        progress.step(_("Writing Network Configuration")) { network.install }
-        progress.step(_("Saving Language Settings")) { language.finish }
-        progress.step(_("Writing repositories information")) { software.finish }
-        progress.step(_("Finishing storage configuration")) { storage.finish }
+      progress.step { software.install }
+      progress.step do
+        on_target do
+          users.write
+          network.install
+          language.finish
+          software.finish
+          storage.finish
+        end
       end
 
       logger.info("Install phase done")
@@ -203,7 +226,7 @@ module Agama
     #
     # @return [Boolean]
     def valid?
-      users.valid? && !software.errors? && !storage.errors?
+      users.issues.empty? && !software.errors? && !storage.errors?
     end
 
     # Collects the logs and stores them into an archive
