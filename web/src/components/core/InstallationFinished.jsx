@@ -22,27 +22,28 @@
 import React, { useState, useEffect } from "react";
 import {
   Alert,
-  Text,
-  EmptyState,
-  EmptyStateBody,
-  EmptyStateHeader,
-  EmptyStateIcon,
-  ExpandableSection,
+  Button,
+  Card, CardBody,
+  EmptyState, EmptyStateBody, EmptyStateHeader, EmptyStateIcon, ExpandableSection,
+  Flex,
+  Grid, GridItem,
+  Stack,
+  Text
 } from "@patternfly/react-core";
-
-import { If, Page } from "~/components/core";
-import { Icon } from "~/components/layout";
-import { useInstallerClient } from "~/context/installer";
+import SimpleLayout from "~/SimpleLayout";
+import { Center, Icon } from "~/components/layout";
 import { EncryptionMethods } from "~/client/storage";
 import { _ } from "~/i18n";
+import { useInstallerClient } from "~/context/installer";
+import alignmentStyles from '@patternfly/react-styles/css/utilities/Alignment/alignment';
 
 const TpmHint = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const title = _("TPM sealing requires the new system to be booted directly.");
 
   return (
-    <Alert isInline variant="info" className="tpm-hint" title={<strong>{title}</strong>}>
-      <div className="stack">
+    <Alert isInline className={alignmentStyles.textAlignLeft} title={<strong>{title}</strong>}>
+      <Stack hasGutter>
         {_("If a local media was used to run this installer, remove it before the next boot.")}
         <ExpandableSection
           isExpanded={isExpanded}
@@ -56,7 +57,7 @@ open encrypted devices will take place during the first boot of the new system. 
 the machine needs to boot directly to the new boot loader.")
           }
         </ExpandableSection>
-      </div>
+      </Stack>
     </Alert>
   );
 };
@@ -74,12 +75,9 @@ function InstallationFinished() {
       const iguana = await client.manager.useIguana();
       // FIXME: This logic should likely not be placed here, it's too coupled to storage internals.
       // Something to fix when this whole page is refactored in a (hopefully near) future.
-      // const { settings: { encryptionPassword, encryptionMethod } } = await client.storage.proposal.getResult();
-      // TODO: The storage client is not adapted to the HTTP API yet.
-      const encryptionPassword = null;
-      const encryptionMethod = null;
+      const { settings: { encryptionPassword, encryptionMethod } } = await client.storage.proposal.getResult();
       setUsingIguana(iguana);
-      setUsingTpm(encryptionPassword?.length && encryptionMethod === EncryptionMethods.TPM);
+      setUsingTpm(encryptionPassword?.length > 0 && encryptionMethod === EncryptionMethods.TPM);
     }
 
     // TODO: display the page in a loading mode while needed data is being fetched.
@@ -87,36 +85,41 @@ function InstallationFinished() {
   });
 
   return (
-    // TRANSLATORS: page title
-    <Page icon="task_alt" title={_("Installation Finished")}>
-      <EmptyState variant="xl">
-        <EmptyStateHeader
-          titleText={_("Congratulations!")}
-          headingLevel="h2"
-          icon={<EmptyStateIcon icon={SuccessIcon} />}
-        />
-        <EmptyStateBody>
-          <Text>{_("The installation on your machine is complete.")}</Text>
-          <Text>
-            <If
-              condition={usingIguana}
-              then={_("At this point you can power off the machine.")}
-              else={_("At this point you can reboot the machine to log in to the new system.")}
-            />
-          </Text>
-          <If
-            condition={usingTpm}
-            then={<TpmHint />}
-          />
-        </EmptyStateBody>
-      </EmptyState>
-
-      <Page.Actions>
-        <Page.Action onClick={closingAction}>
-          {usingIguana ? _("Finish") : _("Reboot")}
-        </Page.Action>
-      </Page.Actions>
-    </Page>
+    <SimpleLayout showOutlet={false}>
+      <Center>
+        <Grid hasGutter>
+          <GridItem sm={8} smOffset={2}>
+            <Card isRounded>
+              <CardBody>
+                <Stack hasGutter>
+                  <EmptyState variant="xl">
+                    <EmptyStateHeader
+                      titleText={_("Congratulations!")}
+                      headingLevel="h2"
+                      icon={<EmptyStateIcon icon={SuccessIcon} />}
+                    />
+                    <EmptyStateBody>
+                      <Text>{_("The installation on your machine is complete.")}</Text>
+                      <Text>
+                        {usingIguana
+                          ? _("At this point you can power off the machine.")
+                          : _("At this point you can reboot the machine to log in to the new system.")}
+                      </Text>
+                      {usingTpm && <TpmHint />}
+                    </EmptyStateBody>
+                  </EmptyState>
+                  <Flex direction={{ default: "rowReverse" }}>
+                    <Button size="lg" variant="primary" onClick={closingAction}>
+                      {usingIguana ? _("Finish") : _("Reboot")}
+                    </Button>
+                  </Flex>
+                </Stack>
+              </CardBody>
+            </Card>
+          </GridItem>
+        </Grid>
+      </Center>
+    </SimpleLayout>
   );
 }
 

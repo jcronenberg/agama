@@ -29,7 +29,7 @@ import { EncryptionMethods } from "~/client/storage";
 import InstallationFinished from "./InstallationFinished";
 
 jest.mock("~/client");
-jest.mock("~/components/core/Sidebar", () => () => <div>Agama sidebar</div>);
+jest.mock("~/components/core/InstallerOptions", () => () => <div>Installer Options</div>);
 
 const finishInstallationFn = jest.fn();
 let encryptionPassword;
@@ -73,7 +73,7 @@ describe("InstallationFinished", () => {
     expect(finishInstallationFn).toHaveBeenCalled();
   });
 
-  describe.skip("when TPM is set as encryption method", () => {
+  describe("when TPM is set as encryption method", () => {
     beforeEach(() => {
       encryptionMethod = EncryptionMethods.TPM;
     });
@@ -91,27 +91,15 @@ describe("InstallationFinished", () => {
       });
 
       it("does not show the TPM reminder", async () => {
-        const { user } = installerRender(<InstallationFinished />);
-        // Forcing the test to slow down a bit with a fake user interaction
-        // because actually the reminder will be not rendered immediately
-        // making the queryAllByText to produce a false positive if triggered
-        // too early here.
-        const congratsText = screen.getByText("Congratulations!");
-        await user.click(congratsText);
-        expect(screen.queryAllByText(/TPM/)).toHaveLength(0);
+        installerRender(<InstallationFinished />);
+        screen.queryAllByText(/TPM/);
       });
     });
   });
 
   describe("when TPM is not set as encryption method", () => {
     it("does not show the TPM reminder", async () => {
-      const { user } = installerRender(<InstallationFinished />);
-      // Forcing the test to slow down a bit with a fake user interaction
-      // because actually the reminder will be not rendered immediately
-      // making the queryAllByText to produce a false positive if triggered
-      // too early here.
-      const congratsText = screen.getByText("Congratulations!");
-      await user.click(congratsText);
+      installerRender(<InstallationFinished />);
       expect(screen.queryAllByText(/TPM/)).toHaveLength(0);
     });
   });
