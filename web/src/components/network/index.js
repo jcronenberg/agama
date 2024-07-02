@@ -20,7 +20,6 @@
  */
 
 export { default as NetworkPage } from "./NetworkPage";
-export { default as NetworkPageMenu } from "./NetworkPageMenu";
 export { default as AddressesDataList } from "./AddressesDataList";
 export { default as ConnectionsTable } from "./ConnectionsTable";
 export { default as DnsDataList } from "./DnsDataList";
@@ -29,7 +28,5 @@ export { default as IpPrefixInput } from "./IpPrefixInput";
 export { default as IpSettingsForm } from "./IpSettingsForm";
 export { default as WifiConnectionForm } from "./WifiConnectionForm";
 export { default as WifiHiddenNetworkForm } from "./WifiHiddenNetworkForm";
-export { default as WifiNetworkListItem } from "./WifiNetworkListItem";
-export { default as WifiNetworkMenu } from "./WifiNetworkMenu";
-export { default as WifiNetworksList } from "./WifiNetworksList";
-export { default as WifiSelector } from "./WifiSelector";
+export { default as WifiNetworksListPage } from "./WifiNetworksListPage";
+export { default as WifiSelectorPage } from "./WifiSelectorPage";

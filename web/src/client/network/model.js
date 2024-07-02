@@ -42,6 +42,7 @@ const DeviceState = Object.freeze({
   UNAVAILABLE: "unavailable",
   DISCONNECTED: "disconnected",
   CONFIG: "config",
+  IPCHECK: "ipCheck",
   NEEDAUTH: "needAuth",
   ACTIVATED: "activated",
   DEACTIVATING: "deactivating",
@@ -176,8 +177,8 @@ const ApSecurityFlags = Object.freeze({
 /**
 * @typedef {object} NetworkSettings
 * @property {boolean} connectivity
-* @property {boolean} wirelessEnabled
-* @property {boolean} networkingEnabled
+* @property {boolean} wireless_enabled
+* @property {boolean} networking_enabled
 * @property {string} hostname
 
 /**

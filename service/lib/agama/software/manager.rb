@@ -20,6 +20,7 @@
 # find current contact information at www.suse.com.
 
 require "fileutils"
+require "json"
 require "yast"
 require "y2packager/product"
 require "y2packager/resolvable"
@@ -32,14 +33,15 @@ require "agama/software/product"
 require "agama/software/product_builder"
 require "agama/software/proposal"
 require "agama/software/repositories_manager"
+require "agama/with_locale"
 require "agama/with_progress"
 require "agama/with_issues"
 
+Yast.import "Language"
 Yast.import "Package"
 Yast.import "Packages"
 Yast.import "PackageCallbacks"
 Yast.import "Pkg"
-Yast.import "Stage"
 
 module Agama
   module Software
@@ -54,6 +56,7 @@ module Agama
     #   It shoud be splitted in separate and smaller classes.
     class Manager # rubocop:disable Metrics/ClassLength
       include Helpers
+      include WithLocale
       include WithIssues
       include WithProgress
       include Yast::I18n
@@ -71,6 +74,11 @@ module Agama
 
       PROPOSAL_ID = "agama-user-software-selection"
       private_constant :PROPOSAL_ID
+
+      # create the libzypp lock and the zypp caches in a special directory to
+      # not be affected by the Live system package management
+      TARGET_DIR = "/run/agama/zypp"
+      private_constant :TARGET_DIR
 
       attr_accessor :languages
 
@@ -97,6 +105,7 @@ module Agama
         @user_patterns = []
         @selected_patterns_change_callbacks = []
         on_progress_change { logger.info(progress.to_s) }
+        initialize_target
       end
 
       # Selects a product with the given id.
@@ -112,8 +121,10 @@ module Agama
 
         raise ArgumentError unless new_product
 
+        update_repositories(new_product)
+
         @product = new_product
-        repositories.delete_all
+
         update_issues
         true
       end
@@ -124,28 +135,27 @@ module Agama
 
         logger.info "Probing software"
 
-        # as we use liveDVD with normal like ENV, lets temporary switch to normal to use its repos
-        Yast::Stage.Set("normal")
-
         if repositories.empty?
-          start_progress(4)
-          store_original_repos
+          start_progress_with_size(3)
           Yast::PackageCallbacks.InitPackageCallbacks(logger)
-          progress.step(_("Initializing target repositories")) { initialize_target_repos }
           progress.step(_("Initializing sources")) { add_base_repos }
         else
-          start_progress(2)
+          start_progress_with_size(2)
         end
 
         progress.step(_("Refreshing repositories metadata")) { repositories.load }
         progress.step(_("Calculating the software proposal")) { propose }
 
-        Yast::Stage.Set("initial")
         update_issues
       end
 
-      def initialize_target_repos
-        Yast::Pkg.TargetInitialize("/")
+      def initialize_target
+        # create the zypp lock also in the target directory
+        ENV["ZYPP_LOCKFILE_ROOT"] = TARGET_DIR
+        # cleanup the previous content (after service restart or crash)
+        FileUtils.rm_rf(TARGET_DIR)
+        FileUtils.mkdir_p(TARGET_DIR)
+        Yast::Pkg.TargetInitialize(TARGET_DIR)
         import_gpg_keys
       end
 
@@ -166,8 +176,13 @@ module Agama
 
       # Installs the packages to the target system
       def install
+        # move the target from the Live ISO to the installed system (/mnt)
+        Yast::Pkg.TargetFinish
+        Yast::Pkg.TargetInitialize(Yast::Installation.destdir)
+        Yast::Pkg.TargetLoad
+
         steps = proposal.packages_count
-        start_progress(steps)
+        start_progress_with_size(steps)
         Callbacks::Progress.setup(steps, progress)
 
         # TODO: error handling
@@ -186,14 +201,11 @@ module Agama
 
       # Writes the repositories information to the installed system
       def finish
-        start_progress(2)
-        progress.step(_("Writing repositories to the target system")) do
-          Yast::Pkg.SourceSaveAll
-          Yast::Pkg.TargetFinish
-          Yast::Pkg.SourceCacheCopyTo(Yast::Installation.destdir)
-          registration.finish
-        end
-        progress.step(_("Restoring original repositories")) { restore_original_repos }
+        Yast::Pkg.SourceSaveAll
+        Yast::Pkg.TargetFinish
+        # copy the libzypp caches to the target
+        copy_zypp_to_target
+        registration.finish
       end
 
       # Determine whether the given tag is provided by the selected packages
@@ -382,6 +394,43 @@ module Agama
         issues
       end
 
+      # Change the locale and activate new locale in the libzypp backend
+      #
+      # @param locale [String] the new locale
+      def locale=(locale)
+        change_process_locale(locale)
+        language, = locale.split(".")
+
+        # set the locale in the Language module, when changing the repository
+        # (product) it calls Pkg.SetTextLocale(Language.language) internally
+        Yast::Language.Set(language)
+
+        # set libzypp locale (for communication only, Pkg.SetPackageLocale
+        # call can be used for *installing* the language packages)
+        Yast::Pkg.SetTextLocale(language)
+
+        # refresh all enabled repositories to download the missing translation files
+        Yast::Pkg.SourceGetCurrent(true).each do |src|
+          Yast::Pkg.SourceForceRefreshNow(src)
+        end
+
+        # remember the currently selected packages and patterns by YaST
+        # (ignore the automatic selections done by the solver)
+        #
+        # NOTE: we will need to handle also the tabooed and soft-locked objects
+        # when we allow to set them via UI or CLI
+        selected = Y2Packager::Resolvable.find(status: :selected, transact_by: :appl_high)
+
+        # save and reload all repositories to activate the new translations
+        Yast::Pkg.SourceSaveAll
+        Yast::Pkg.SourceFinishAll
+        Yast::Pkg.SourceRestore
+        Yast::Pkg.SourceLoad
+
+        # restore back the selected objects
+        selected.each { |s| Yast::Pkg.ResolvableInstall(s.name, s.kind) }
+      end
+
     private
 
       # @return [Agama::Config]
@@ -412,32 +461,64 @@ module Agama
       end
 
       def add_base_repos
+        # NOTE: support multiple labels/installation media?
+        label = product.labels.first
+
+        if label
+          logger.info "Installation repository label: #{label.inspect}"
+          # we cannot use the simple /dev/disk/by-label/* device file as there
+          # might be multiple devices with the same label
+          device = installation_device(label)
+          if device
+            logger.info "Installation device: #{device}"
+            repositories.add("hd:/?device=" + device)
+            return
+          end
+        end
+
+        # disk label not found or not configured, use the online repositories
         product.repositories.each { |url| repositories.add(url) }
       end
 
-      REPOS_BACKUP = "/etc/zypp/repos.d.agama.backup"
-      private_constant :REPOS_BACKUP
-
-      REPOS_DIR = "/etc/zypp/repos.d"
-      private_constant :REPOS_DIR
-
-      # ensure that repos backup is there and repos.d is empty
-      def store_original_repos
-        # Backup was already created, so just remove all repos
-        if File.directory?(REPOS_BACKUP)
-          logger.info "removing #{REPOS_DIR}"
-          FileUtils.rm_rf(REPOS_DIR)
-        else # move repos to backup
-          logger.info "moving #{REPOS_DIR} to #{REPOS_BACKUP}"
-          FileUtils.mv(REPOS_DIR, REPOS_BACKUP)
+      # find all devices with the required disk label
+      # @return [Array<String>] returns list of devices, e.g. `["/dev/sr1"]`,
+      # returns empty list if there is no device with the required label
+      def disks_with_label(label)
+        data = list_disks
+        disks = data.fetch("blockdevices", []).map do |device|
+          device["kname"] if device["label"] == label
         end
+        disks.compact!
+        logger.info "Disks with the installation label: #{disks.inspect}"
+        disks
       end
 
-      def restore_original_repos
-        logger.info "removing #{REPOS_DIR}"
-        FileUtils.rm_rf(REPOS_DIR)
-        logger.info "moving #{REPOS_BACKUP} to #{REPOS_DIR}"
-        FileUtils.mv(REPOS_BACKUP, REPOS_DIR)
+      # get list of disks, returns parsed data from the `lsblk` call
+      # @return [Hash] parsed data
+      def list_disks
+        # we need only the kernel device name and the label
+        output = `lsblk --paths --json --output kname,label`
+        JSON.parse(output)
+      rescue StandardError => e
+        logger.error "ERROR: Cannot read disk devices: #{e}"
+        {}
+      end
+
+      # find the installation device with the required label
+      # @return [String,nil] Device name (`/dev/sr1`) or `nil` if not found
+      def installation_device(label)
+        disks = disks_with_label(label)
+
+        # multiple installation media?
+        if disks.size > 1
+          # prefer optical media (/dev/srX) to disk so the disk can be used as
+          # the installation target
+          optical = disks.find { |d| d.match(/\A\/dev\/sr[0-9]+\z/) }
+          optical || disks.first
+        else
+          # none or just one disk
+          disks.first
+        end
       end
 
       # Adds resolvables for selected product
@@ -513,6 +594,74 @@ module Agama
 
       def pattern_exist?(pattern_name)
         !Y2Packager::Resolvable.find(kind: :pattern, name: pattern_name).empty?
+      end
+
+      # this reimplements the Pkg.SourceCacheCopyTo call which works correctly
+      # only from the inst-sys (it copies the data from "/" where is actually
+      # the Live system package manager)
+      # @see https://github.com/yast/yast-pkg-bindings/blob/3d314480b70070299f90da4c6e87a5574e9c890c/src/Source_Installation.cc#L213-L267
+      def copy_zypp_to_target
+        # copy the zypp "raw" cache
+        cache = File.join(TARGET_DIR, "/var/cache/zypp/raw")
+        if Dir.exist?(cache)
+          target_cache = File.join(Yast::Installation.destdir, "/var/cache/zypp")
+          FileUtils.mkdir_p(target_cache)
+          FileUtils.cp_r(cache, target_cache)
+        end
+
+        # copy the "solv" cache but skip the "@System" directory because it
+        # contains empty installed packages (there were no installed packages
+        # before moving the target to "/mnt")
+        solv_cache = File.join(TARGET_DIR, "/var/cache/zypp/solv")
+        target_solv = File.join(Yast::Installation.destdir, "/var/cache/zypp/solv")
+        solvs = Dir.entries(solv_cache) - [".", "..", "@System"]
+        solvs.each do |s|
+          FileUtils.cp_r(File.join(solv_cache, s), target_solv)
+        end
+
+        # copy the zypp credentials if present
+        credentials = File.join(TARGET_DIR, "/etc/zypp/credentials.d")
+        if Dir.exist?(credentials)
+          target_credentials = File.join(Yast::Installation.destdir, "/etc/zypp")
+          FileUtils.mkdir_p(target_credentials)
+          FileUtils.cp_r(credentials, target_credentials)
+        end
+
+        # copy the global credentials if present
+        glob_credentials = File.join(TARGET_DIR, "/etc/zypp/credentials.cat")
+        return unless File.exist?(glob_credentials)
+
+        target_dir = File.join(Yast::Installation.destdir, "/etc/zypp")
+        FileUtils.mkdir_p(target_dir)
+        FileUtils.copy(glob_credentials, target_dir)
+      end
+
+      # Is any local repository (CD/DVD, disk) currently used?
+      # @return [Boolean] true if any local repository is used
+      def local_repo?
+        Agama::Software::Repository.all.any?(&:local?)
+      end
+
+      # update the zypp repositories for the new product, either delete them
+      # or keep them untouched
+      # @param new_product [Agama::Software::Product] the new selected product
+      def update_repositories(new_product)
+        # reuse the repositories when they are the same as for the previously
+        # selected product and no local repository is currently used
+        # (local repositories are usually product specific)
+        # TODO: what about registered products?
+        # TODO: allow a partial match? i.e. keep the same repositories, delete
+        # additional repositories and add missing ones
+        if product&.repositories&.sort == new_product.repositories.sort && !local_repo?
+          # the same repositories, we just needed to reset the package selection
+          Yast::Pkg.PkgReset()
+        else
+          # delete all, the #probe call will add the new repos
+          repositories.delete_all
+          # deleting happens only in memory, to really delete the caches we need
+          # to write the repository setup to the disk
+          Yast::Pkg.SourceSaveAll
+        end
       end
     end
   end

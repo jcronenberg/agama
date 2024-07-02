@@ -21,13 +21,11 @@
 
 // @ts-check
 
-import React, { useState } from "react";
+import React from "react";
 import { Skeleton } from "@patternfly/react-core";
-
-import { _ } from "~/i18n";
-import { DeviceSelectionDialog, ProposalPageMenu } from "~/components/storage";
+import { ButtonLink, CardField } from "~/components/core";
 import { deviceLabel } from '~/components/storage/utils';
-import { If, Field } from "~/components/core";
+import { _ } from "~/i18n";
 import { sprintf } from "sprintf-js";
 
 /**
@@ -37,7 +35,7 @@ import { sprintf } from "sprintf-js";
 
 const LABEL = _("Installation device");
 // TRANSLATORS: The storage "Installation device" field's description.
-const DESCRIPTION = _("Select the main disk or LVM Volume Group for installation.");
+const DESCRIPTION = _("Main disk or LVM Volume Group for installation.");
 
 /**
  * Generates the target value.
@@ -49,23 +47,20 @@ const DESCRIPTION = _("Select the main disk or LVM Volume Group for installation
  * @returns {string}
  */
 const targetValue = (target, targetDevice, targetPVDevices) => {
-  if (target === "DISK" && targetDevice) return deviceLabel(targetDevice);
+  if (target === "DISK" && targetDevice) {
+    // TRANSLATORS: %s is the installation disk (eg. "/dev/sda, 80 GiB)
+    return sprintf(_("File systems created as new partitions at %s"), deviceLabel(targetDevice));
+  }
   if (target === "NEW_LVM_VG" && targetPVDevices.length > 0) {
-    if (targetPVDevices.length > 1) return _("new LVM volume group");
+    if (targetPVDevices.length > 1) return _("File systems created at a new LVM volume group");
 
     if (targetPVDevices.length === 1) {
       // TRANSLATORS: %s is the disk used for the LVM physical volumes (eg. "/dev/sda, 80 GiB)
-      return sprintf(_("new LVM volume group on %s"), deviceLabel(targetPVDevices[0]));
+      return sprintf(_("File systems created at a new LVM volume group on %s"), deviceLabel(targetPVDevices[0]));
     }
   }
 
   return _("No device selected yet");
-};
-
-const StorageTechSelector = () => {
-  return (
-    <ProposalPageMenu label={_("storage technologies")} />
-  );
 };
 
 /**
@@ -92,51 +87,25 @@ export default function InstallationDeviceField({
   target,
   targetDevice,
   targetPVDevices,
-  devices,
   isLoading,
-  onChange
 }) {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  const openDialog = () => setIsDialogOpen(true);
-
-  const closeDialog = () => setIsDialogOpen(false);
-
-  const onAccept = ({ target, targetDevice, targetPVDevices }) => {
-    closeDialog();
-    onChange({ target, targetDevice, targetPVDevices });
-  };
-
   let value;
   if (isLoading || !target)
-    value = <Skeleton width="25%" />;
+    value = <Skeleton fontSize="sm" width="75%" />;
   else
     value = targetValue(target, targetDevice, targetPVDevices);
 
   return (
-    <Field
-      icon="hard_drive"
+    <CardField
       label={LABEL}
-      value={value}
       description={DESCRIPTION}
-      onClick={openDialog}
+      actions={
+        isLoading
+          ? <Skeleton fontSize="sm" width="100px" />
+          : <ButtonLink to="target-device" isPrimary={false}>{_("Change")}</ButtonLink>
+      }
     >
-      {_("Prepare more devices by configuring advanced")} <StorageTechSelector />
-      <If
-        condition={isDialogOpen}
-        then={
-          <DeviceSelectionDialog
-            isOpen
-            isLoading={isLoading}
-            target={target}
-            targetDevice={targetDevice}
-            targetPVDevices={targetPVDevices}
-            devices={devices}
-            onAccept={onAccept}
-            onCancel={closeDialog}
-          />
-        }
-      />
-    </Field>
+      <CardField.Content isFilled={false}>{value}</CardField.Content>
+    </CardField>
   );
 }

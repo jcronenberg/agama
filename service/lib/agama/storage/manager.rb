@@ -23,7 +23,7 @@ require "yast"
 require "bootloader/proposal_client"
 require "y2storage/storage_manager"
 require "y2storage/clients/inst_prepdisk"
-require "agama/storage/actions"
+require "agama/storage/actions_generator"
 require "agama/storage/proposal"
 require "agama/storage/proposal_settings"
 require "agama/storage/callbacks"
@@ -31,6 +31,7 @@ require "agama/storage/iscsi/manager"
 require "agama/storage/finisher"
 require "agama/storage/proposal_settings_reader"
 require "agama/issue"
+require "agama/with_locale"
 require "agama/with_issues"
 require "agama/with_progress"
 require "agama/security"
@@ -43,6 +44,7 @@ module Agama
   module Storage
     # Manager to handle storage configuration
     class Manager
+      include WithLocale
       include WithIssues
       include WithProgress
       include Yast::I18n
@@ -107,7 +109,7 @@ module Agama
 
       # Probes storage devices and performs an initial proposal
       def probe
-        start_progress(4)
+        start_progress_with_size(4)
         config.pick_product(software.selected_product)
         check_multipath
         progress.step(_("Activating storage devices")) { activate_devices }
@@ -120,7 +122,7 @@ module Agama
 
       # Prepares the partitioning to install the system
       def install
-        start_progress(4)
+        start_progress_with_size(4)
         progress.step(_("Preparing bootloader proposal")) do
           # first make bootloader proposal to be sure that required packages are installed
           proposal = ::Bootloader::ProposalClient.new.make_proposal({})
@@ -167,8 +169,16 @@ module Agama
       def actions
         return [] unless Y2Storage::StorageManager.instance.probed?
 
+        probed = Y2Storage::StorageManager.instance.probed
         staging = Y2Storage::StorageManager.instance.staging
-        Actions.new(logger, staging.actiongraph).all
+        ActionsGenerator.new(probed, staging).generate
+      end
+
+      # Changes the service's locale
+      #
+      # @param locale [String] new locale
+      def locale=(locale)
+        change_process_locale(locale)
       end
 
     private

@@ -25,6 +25,7 @@ require "yast"
 require "y2storage/storage_manager"
 require "agama/dbus/base_object"
 require "agama/dbus/interfaces/issues"
+require "agama/dbus/interfaces/locale"
 require "agama/dbus/interfaces/progress"
 require "agama/dbus/interfaces/service_status"
 require "agama/dbus/storage/devices_tree"
@@ -34,8 +35,9 @@ require "agama/dbus/storage/proposal"
 require "agama/dbus/storage/volume_conversion"
 require "agama/dbus/storage/with_iscsi_auth"
 require "agama/dbus/with_service_status"
-require "agama/storage/volume_templates_builder"
 require "agama/storage/encryption_settings"
+require "agama/storage/proposal_settings_conversion"
+require "agama/storage/volume_templates_builder"
 
 Yast.import "Arch"
 
@@ -48,6 +50,7 @@ module Agama
         include WithServiceStatus
         include ::DBus::ObjectManager
         include DBus::Interfaces::Issues
+        include DBus::Interfaces::Locale
         include DBus::Interfaces::Progress
         include DBus::Interfaces::ServiceStatus
 
@@ -88,6 +91,33 @@ module Agama
           busy_while { backend.probe }
         end
 
+        # Sets the storage config and calculates a proposal (guided or AutoYaST).
+        #
+        # @raise If config is not valid.
+        #
+        # @param serialized_config [String] Serialized storage config. It can be storage or legacy
+        #   AutoYaST settings: { "storage": ... } vs { "legacyAutoyastStorage": ... }.
+        def apply_storage_config(serialized_config)
+          @serialized_storage_config = serialized_config
+          storage_config = JSON.parse(serialized_config, symbolize_names: true)
+
+          if (guided_settings = storage_config.dig(:storage, :guided))
+            calculate_guided_proposal(guided_settings)
+          elsif (autoyast_settings = storage_config[:legacyAutoyastStorage])
+            calculate_autoyast_proposal(autoyast_settings)
+          else
+            raise "Invalid config: #{serialized_config}"
+          end
+        end
+
+        # Serialized storage config. It can contain storage or legacy AutoYaST settings:
+        # { "storage": ... } vs { "legacyAutoyastStorage": ... }
+        #
+        # @return [String]
+        def serialized_storage_config
+          @serialized_storage_config || generate_storage_config.to_json
+        end
+
         def install
           busy_while { backend.install }
         end
@@ -105,6 +135,10 @@ module Agama
 
         dbus_interface STORAGE_INTERFACE do
           dbus_method(:Probe) { probe }
+          dbus_method(:SetConfig, "in serialized_config:s, out result:u") do |serialized_config|
+            busy_while { apply_storage_config(serialized_config) }
+          end
+          dbus_method(:GetConfig, "out config:s") { serialized_storage_config }
           dbus_method(:Install) { install }
           dbus_method(:Finish) { finish }
           dbus_reader(:deprecated_system, "b")
@@ -122,13 +156,15 @@ module Agama
         #   * "Text" [String]
         #   * "Subvol" [Boolean]
         #   * "Delete" [Boolean]
+        #   * "Resize" [Boolean]
         def read_actions
           backend.actions.map do |action|
             {
-              "Device" => action.target_device.sid,
-              "Text"   => action.sentence,
-              "Subvol" => action.device_is?(:btrfs_subvolume),
-              "Delete" => action.delete?
+              "Device" => action.device.sid,
+              "Text"   => action.text,
+              "Subvol" => action.on_btrfs_subvolume?,
+              "Delete" => action.delete?,
+              "Resize" => action.resize?
             }
           end
         end
@@ -191,10 +227,11 @@ module Agama
         end
 
         # Calculates a guided proposal.
+        # @deprecated
         #
         # @param dbus_settings [Hash]
         # @return [Integer] 0 success; 1 error
-        def calculate_guided_proposal(dbus_settings)
+        def calculate_proposal(dbus_settings)
           settings = ProposalSettingsConversion.from_dbus(dbus_settings,
             config: config, logger: logger)
 
@@ -205,23 +242,6 @@ module Agama
           )
 
           success = proposal.calculate_guided(settings)
-          success ? 0 : 1
-        end
-
-        # Calculates an AutoYaST proposal.
-        #
-        # @param dbus_settings [String]
-        # @return [Integer] 0 success; 1 error
-        def calculate_autoyast_proposal(dbus_settings)
-          settings = JSON.parse(dbus_settings)
-
-          logger.info(
-            "Calculating AutoYaST storage proposal from D-Bus.\n " \
-            "D-Bus settings: #{dbus_settings}\n" \
-            "AutoYaST settings: #{settings.inspect}"
-          )
-
-          success = proposal.calculate_autoyast(settings)
           success ? 0 : 1
         end
 
@@ -239,10 +259,11 @@ module Agama
           return {} unless proposal.calculated?
 
           if proposal.strategy?(ProposalStrategy::GUIDED)
+            settings = Agama::Storage::ProposalSettingsConversion.to_schema(proposal.settings)
             {
               "success"  => proposal.success?,
               "strategy" => ProposalStrategy::GUIDED,
-              "settings" => ProposalSettingsConversion.to_dbus(proposal.settings)
+              "settings" => settings.to_json
             }
           else
             {
@@ -269,12 +290,7 @@ module Agama
           #
           # result: 0 success; 1 error
           dbus_method(:Calculate, "in settings:a{sv}, out result:u") do |settings|
-            busy_while { calculate_guided_proposal(settings) }
-          end
-
-          # result: 0 success; 1 error
-          dbus_method(:CalculateAutoyast, "in settings:s, out result:u") do |settings|
-            busy_while { calculate_autoyast_proposal(settings) }
+            busy_while { calculate_proposal(settings) }
           end
 
           dbus_reader :proposal_calculated?, "b", dbus_name: "Calculated"
@@ -354,6 +370,10 @@ module Agama
           dbus_method(:Delete, "in node:o, out result:u") { |n| iscsi_delete(n) }
         end
 
+        def locale=(locale)
+          backend.locale = locale
+        end
+
       private
 
         # @return [Agama::Storage::Manager]
@@ -376,6 +396,62 @@ module Agama
         # @return [Agama::Storage::Proposal]
         def proposal
           backend.proposal
+        end
+
+        # Calculates a guided proposal.
+        #
+        # @param settings [Hash] Settings according to the JSON schema.
+        # @return [Integer] 0 success; 1 error
+        def calculate_guided_proposal(settings)
+          proposal_settings = Agama::Storage::ProposalSettingsConversion.from_schema(
+            settings, config: config
+          )
+
+          logger.info(
+            "Calculating guided storage proposal from D-Bus.\n" \
+            "Input settings: #{settings}\n" \
+            "Agama settings: #{proposal_settings.inspect}"
+          )
+
+          success = proposal.calculate_guided(proposal_settings)
+          success ? 0 : 1
+        end
+
+        # Calculates an AutoYaST proposal.
+        #
+        # @param settings [Hash] AutoYaST settings.
+        # @return [Integer] 0 success; 1 error
+        def calculate_autoyast_proposal(settings)
+          # Ensures keys are strings.
+          autoyast_settings = JSON.parse(settings.to_json)
+
+          logger.info(
+            "Calculating AutoYaST storage proposal from D-Bus.\n" \
+            "Input settings: #{settings}\n" \
+            "AutoYaST settings: #{autoyast_settings}"
+          )
+
+          success = proposal.calculate_autoyast(autoyast_settings)
+          success ? 0 : 1
+        end
+
+        # Generates the storage config from the current proposal, if any.
+        #
+        # @return [Hash] Storage config according to the JSON schema.
+        def generate_storage_config
+          if proposal.strategy?(ProposalStrategy::GUIDED)
+            {
+              storage: {
+                guided: Agama::Storage::ProposalSettingsConversion.to_schema(proposal.settings)
+              }
+            }
+          elsif proposal.strategy?(ProposalStrategy::AUTOYAST)
+            {
+              autoyastLegacyStorage: proposal.settings
+            }
+          else
+            {}
+          end
         end
 
         def register_storage_callbacks

@@ -50,6 +50,7 @@ describe Agama::Software::Manager do
       disabled:   disabled_repos
     )
   end
+  let(:products) { [] }
 
   let(:proposal) do
     instance_double(
@@ -80,8 +81,14 @@ describe Agama::Software::Manager do
     instance_double(Agama::DBus::Clients::Questions)
   end
 
+  let(:target_dir) { Dir.mktmpdir }
+
   before do
+    stub_const("Agama::Software::Manager::TARGET_DIR", target_dir)
     allow(Yast::Pkg).to receive(:TargetInitialize)
+    allow(Yast::Pkg).to receive(:TargetFinish)
+    allow(Yast::Pkg).to receive(:TargetLoad)
+    allow(Yast::Pkg).to receive(:SourceSaveAll)
     allow(Yast::Pkg).to receive(:ImportGPGKey)
     # allow glob to work for other calls
     allow(Dir).to receive(:glob).and_call_original
@@ -95,6 +102,14 @@ describe Agama::Software::Manager do
     allow(Agama::Software::RepositoriesManager).to receive(:new).and_return(repositories)
     allow(Agama::Software::Proposal).to receive(:new).and_return(proposal)
     allow(Agama::ProductReader).to receive(:new).and_call_original
+    allow(FileUtils).to receive(:mkdir_p)
+    allow(FileUtils).to receive(:rm_rf)
+    allow(FileUtils).to receive(:cp_r)
+    allow(File).to receive(:exist?).and_call_original
+  end
+
+  after do
+    FileUtils.rm_r(target_dir)
   end
 
   describe "#new" do
@@ -125,6 +140,20 @@ describe Agama::Software::Manager do
 
         expect(manager.product.id).to eq("test1")
       end
+    end
+
+    context "when GPG keys are available at /" do
+      let(:gpg_keys) { ["/usr/lib/gnupg/keys/gpg-key.asc"] }
+
+      it "imports the GPG keys" do
+        expect(Yast::Pkg).to receive(:ImportGPGKey).with(gpg_keys.first, true)
+        described_class.new(config, logger)
+      end
+    end
+
+    it "initializes the package system" do
+      expect(Yast::Pkg).to receive(:TargetInitialize)
+      described_class.new(config, logger)
     end
   end
 
@@ -184,33 +213,9 @@ describe Agama::Software::Manager do
   end
 
   describe "#probe" do
-    let(:rootdir) { Dir.mktmpdir }
-    let(:repos_dir) { File.join(rootdir, "etc", "zypp", "repos.d") }
-    let(:backup_repos_dir) { File.join(rootdir, "etc", "zypp", "repos.d.backup") }
-
     before do
-      stub_const("Agama::Software::Manager::REPOS_DIR", repos_dir)
-      stub_const("Agama::Software::Manager::REPOS_BACKUP", backup_repos_dir)
-      FileUtils.mkdir_p(repos_dir)
       subject.select_product("Tumbleweed")
-    end
-
-    after do
-      FileUtils.remove_entry(rootdir)
-    end
-
-    it "initializes the package system" do
-      expect(Yast::Pkg).to receive(:TargetInitialize).with("/")
-      subject.probe
-    end
-
-    context "when GPG keys are available at /" do
-      let(:gpg_keys) { ["/usr/lib/gnupg/keys/gpg-key.asc"] }
-
-      it "imports the GPG keys" do
-        expect(Yast::Pkg).to receive(:ImportGPGKey).with(gpg_keys.first, true)
-        subject.probe
-      end
+      allow(subject).to receive(:list_disks).and_return({})
     end
 
     it "creates a packages proposal" do
@@ -224,17 +229,32 @@ describe Agama::Software::Manager do
       subject.probe
     end
 
+    it "uses the offline medium if available" do
+      device = "/dev/sr1"
+      expect(subject).to receive(:list_disks).and_return({
+        "blockdevices" => [
+          {
+            "kname" => device,
+            "label" => "openSUSE-Tumbleweed-DVD-x86_64"
+          }
+        ]
+      })
+
+      expect(repositories).to receive(:add).with("hd:/?device=" + device)
+      subject.probe
+    end
+
     include_examples "software issues", "probe"
   end
 
   describe "#products" do
     it "returns the list of known products" do
       products = subject.products
-      expect(products.size).to eq(2)
       expect(products).to all(be_a(Agama::Software::Product))
       expect(products).to contain_exactly(
         an_object_having_attributes(id: "Tumbleweed"),
-        an_object_having_attributes(id: "MicroOS")
+        an_object_having_attributes(id: "MicroOS"),
+        an_object_having_attributes(id: "Leap_16.0")
       )
     end
   end
@@ -348,34 +368,76 @@ describe Agama::Software::Manager do
         expect { subject.install }.to raise_error(RuntimeError)
       end
     end
+
+    it "moves the packaging target to /mnt" do
+      expect(Yast::Pkg).to receive(:TargetFinish)
+      expect(Yast::Pkg).to receive(:TargetInitialize).with(destdir)
+      expect(Yast::Pkg).to receive(:TargetLoad)
+      subject.install
+    end
   end
 
   describe "#finish" do
-    let(:rootdir) { Dir.mktmpdir }
-    let(:repos_dir) { File.join(rootdir, "etc", "zypp", "repos.d") }
-    let(:backup_repos_dir) { File.join(rootdir, "etc", "zypp", "repos.d.backup") }
-
-    before do
-      stub_const("Agama::Software::Manager::REPOS_DIR", repos_dir)
-      stub_const("Agama::Software::Manager::REPOS_BACKUP", backup_repos_dir)
-      FileUtils.mkdir_p(repos_dir)
-      FileUtils.mkdir_p(backup_repos_dir)
-      FileUtils.touch(File.join(backup_repos_dir, "example.repo"))
-      puts Dir[File.join(repos_dir, "**", "*")]
-    end
-
-    after do
-      FileUtils.remove_entry(rootdir)
-    end
-
-    it "releases the packaging system and restores the backup" do
+    it "releases the packaging system" do
+      allow(subject).to receive(:copy_zypp_to_target)
       expect(Yast::Pkg).to receive(:SourceSaveAll)
       expect(Yast::Pkg).to receive(:TargetFinish)
-      expect(Yast::Pkg).to receive(:SourceCacheCopyTo)
-        .with(Yast::Installation.destdir)
 
       subject.finish
-      expect(File).to exist(File.join(repos_dir, "example.repo"))
+    end
+
+    it "copies the libzypp cache and credentials to the target system" do
+      allow(Dir).to receive(:exist?).and_call_original
+      allow(Dir).to receive(:entries).and_call_original
+
+      # copying the raw cache
+      expect(Dir).to receive(:exist?).with(
+        File.join(target_dir, "/var/cache/zypp/raw")
+      ).and_return(true)
+      expect(FileUtils).to receive(:mkdir_p).with(
+        File.join(Yast::Installation.destdir, "/var/cache/zypp")
+      )
+      expect(FileUtils).to receive(:cp_r).with(
+        File.join(target_dir, "/var/cache/zypp/raw"),
+        File.join(Yast::Installation.destdir, "/var/cache/zypp")
+      )
+
+      # copy the solv cache
+      repo_alias = "https-download.opensuse.org-94cc89aa"
+      expect(Dir).to receive(:entries)
+        .with(File.join(target_dir, "/var/cache/zypp/solv"))
+        .and_return([".", "..", "@System", repo_alias])
+      expect(FileUtils).to receive(:cp_r).with(
+        File.join(target_dir, "/var/cache/zypp/solv/", repo_alias),
+        File.join(Yast::Installation.destdir, "/var/cache/zypp/solv")
+      )
+      # ensure the @System cache is not copied
+      expect(FileUtils).to_not receive(:cp_r).with(
+        File.join(target_dir, "/var/cache/zypp/solv/@System"),
+        File.join(Yast::Installation.destdir, "/var/cache/zypp/solv")
+      )
+
+      # copying the credentials.d directory
+      expect(Dir).to receive(:exist?)
+        .with(File.join(target_dir, "/etc/zypp/credentials.d"))
+        .and_return(true)
+      expect(FileUtils).to receive(:mkdir_p)
+        .with(File.join(Yast::Installation.destdir, "/etc/zypp"))
+      expect(FileUtils).to receive(:cp_r).with(
+        File.join(target_dir, "/etc/zypp/credentials.d"),
+        File.join(Yast::Installation.destdir, "/etc/zypp")
+      )
+
+      # copying the global credentials file
+      expect(File).to receive(:exist?)
+        .with(File.join(target_dir, "/etc/zypp/credentials.cat"))
+        .and_return(true)
+      expect(FileUtils).to receive(:copy).with(
+        File.join(target_dir, "/etc/zypp/credentials.cat"),
+        File.join(Yast::Installation.destdir, "/etc/zypp")
+      )
+
+      subject.finish
     end
   end
 

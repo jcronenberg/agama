@@ -23,15 +23,23 @@
 
 import React, { useState } from "react";
 import {
-  InputGroup, InputGroupItem, FormGroup, FormSelect, FormSelectOption, MenuToggle, Popover, Radio,
-  Select, SelectOption, SelectList, TextInput
+  FormGroup, FormSelect, FormSelectOption,
+  InputGroup, InputGroupItem,
+  MenuToggle,
+  Popover,
+  Radio,
+  Select, SelectOption, SelectList,
+  Split,
+  Stack,
+  TextInput
 } from "@patternfly/react-core";
-import { sprintf } from "sprintf-js";
-
-import { _, N_ } from "~/i18n";
-import { FormValidationError, FormReadOnlyField, If, NumericTextInput } from '~/components/core';
+import { FormValidationError, FormReadOnlyField, NumericTextInput } from '~/components/core';
 import { Icon } from "~/components/layout";
+import { _, N_ } from "~/i18n";
+import { sprintf } from "sprintf-js";
 import { SIZE_METHODS, SIZE_UNITS } from '~/components/storage/utils';
+
+const { K, ...MAX_SIZE_UNITS } = SIZE_UNITS;
 
 /**
  * @typedef {import ("~/client/storage").Volume} Volume
@@ -292,7 +300,7 @@ const SizeAuto = ({ volume }) => {
  */
 const SizeManual = ({ errors, formData, isDisabled, onChange }) => {
   return (
-    <div className="stack">
+    <Stack hasGutter>
       <p>
         {_("Exact size for the file system.")}
       </p>
@@ -334,7 +342,7 @@ const SizeManual = ({ errors, formData, isDisabled, onChange }) => {
         </InputGroup>
         <FormValidationError message={errors.size} />
       </FormGroup>
-    </div>
+    </Stack>
   );
 };
 
@@ -350,12 +358,12 @@ const SizeManual = ({ errors, formData, isDisabled, onChange }) => {
  */
 const SizeRange = ({ errors, formData, isDisabled, onChange }) => {
   return (
-    <div className="stack">
+    <Stack hasGutter>
       <p>
         {_("Limits for the file system size. The final size will be a value between the given minimum \
 and maximum. If no maximum is given then the file system will be as big as possible.")}
       </p>
-      <div className="split" data-items-alignment="start">
+      <Split hasGutter>
         <FormGroup
           isRequired
           // TRANSLATORS: the minimal partition size
@@ -416,7 +424,7 @@ and maximum. If no maximum is given then the file system will be as big as possi
                 /** @ts-expect-error: for some reason using id makes TS complain */
                 id="maxSizeUnit"
                 aria-label={_("Unit for the maximum size")}
-                units={Object.values(SIZE_UNITS)}
+                units={Object.values(MAX_SIZE_UNITS)}
                 value={formData.maxSizeUnit || formData.minSizeUnit}
                 onChange={(_, maxSizeUnit) => onChange({ maxSizeUnit })}
                 isDisabled={isDisabled}
@@ -425,8 +433,8 @@ and maximum. If no maximum is given then the file system will be as big as possi
           </InputGroup>
           <FormValidationError message={errors.maxSize} />
         </FormGroup>
-      </div>
-    </div>
+      </Split>
+    </Stack>
   );
 };
 
@@ -465,7 +473,7 @@ const SizeOptionsField = ({ volume, formData, isDisabled = false, errors = {}, o
   return (
     <FormGroup role="radiogroup" fieldId="size" label={_("Size")} isRequired>
       <div>
-        <div className="split radio-group">
+        <Split hasGutter className="radio-group">
           {sizeOptions.map((value) => {
             const isSelected = sizeMethod === value;
 
@@ -484,12 +492,12 @@ const SizeOptionsField = ({ volume, formData, isDisabled = false, errors = {}, o
               />
             );
           })}
-        </div>
+        </Split>
 
         <div aria-live="polite" className="highlighted-live-region">
-          <If condition={sizeMethod === SIZE_METHODS.AUTO} then={<SizeAuto {...sizeWidgetProps} />} />
-          <If condition={sizeMethod === SIZE_METHODS.RANGE} then={<SizeRange {...sizeWidgetProps} />} />
-          <If condition={sizeMethod === SIZE_METHODS.MANUAL} then={<SizeManual {...sizeWidgetProps} />} />
+          {sizeMethod === SIZE_METHODS.AUTO && <SizeAuto {...sizeWidgetProps} />}
+          {sizeMethod === SIZE_METHODS.RANGE && <SizeRange {...sizeWidgetProps} />}
+          {sizeMethod === SIZE_METHODS.MANUAL && <SizeManual {...sizeWidgetProps} />}
         </div>
       </div>
     </FormGroup>
