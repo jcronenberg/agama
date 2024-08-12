@@ -29,9 +29,19 @@ module Agama
       # param target_graph [Y2Storage::Devicegraph]
       def initialize(system_graph, target_graph)
         @system_graph = system_graph
-        # It is important to keep a reference to the actiongraph. Otherwise, the gargabe collector
-        # could kill the actiongraph, leaving the compound actions orphan.
-        # See https://github.com/openSUSE/agama/issues/1377.
+
+        # Keep a reference to the actiongraph. Otherwise, accessing to the compound actions could
+        # raise a segmentation fault if the actiongraph object was killed by the ruby GC.
+        #
+        # Source of the problem:
+        #   * An actiongraph is generated from the target devicegraph.
+        #   * The list of compound actions is recovered from the actiongraph.
+        #   * If there is no refrence to the actiongraph, then the actiongraph object is a candidate
+        #     to be cleaned by the ruby GC.
+        #   * Accessing to the generated compound actions raises a segmentation fault if the
+        #     actiongraph was cleaned.
+        #
+        # See https://github.com/openSUSE/agama/issues/1396.
         @actiongraph = target_graph.actiongraph
       end
 

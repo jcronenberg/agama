@@ -30,15 +30,24 @@ import { useEffect, useRef, useCallback, useState } from "react";
  * @param {any} value - the value to be checked
  * @return {boolean} true when given value is an object; false otherwise
  */
-const isObject = (value) => (
-  typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    !(value instanceof RegExp) &&
-    !(value instanceof Date) &&
-    !(value instanceof Set) &&
-    !(value instanceof Map)
-);
+const isObject = (value) =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  !(value instanceof RegExp) &&
+  !(value instanceof Date) &&
+  !(value instanceof Set) &&
+  !(value instanceof Map);
+
+/**
+ * Whether given object is empty or not
+ *
+ * @param {object} value - the value to be checked
+ * @return {boolean} true when given value is an empty object; false otherwise
+ */
+const isObjectEmpty = (value) => {
+  return Object.keys(value).length === 0;
+};
 
 /**
  * Returns an empty function useful to be used as a default callback.
@@ -46,6 +55,11 @@ const isObject = (value) => (
  * @return {function} empty function
  */
 const noop = () => undefined;
+
+/**
+ * @return {function} identity function
+ */
+const identity = (i) => i;
 
 /**
  * Returns a new array with a given collection split into two groups, the first holding elements
@@ -59,7 +73,7 @@ const partition = (collection, filter) => {
   const pass = [];
   const fail = [];
 
-  collection.forEach(element => {
+  collection.forEach((element) => {
     filter(element) ? pass.push(element) : fail.push(element);
   });
 
@@ -74,7 +88,7 @@ const partition = (collection, filter) => {
  * @returns {Array}
  */
 function compact(collection) {
-  return collection.filter(e => e !== null && e !== undefined);
+  return collection.filter((e) => e !== null && e !== undefined);
 }
 
 /**
@@ -101,7 +115,7 @@ function uniq(collection) {
  * @returns {String} - CSS classes joined together after ignoring falsy values
  */
 function classNames(...classes) {
-  return classes.filter((item) => !!item).join(' ');
+  return classes.filter((item) => !!item).join(" ");
 }
 
 /**
@@ -123,15 +137,15 @@ function makeCancellable(promise) {
 
   const cancellablePromise = new Promise((resolve, reject) => {
     promise
-      .then((value) => (!isCanceled && resolve(value)))
-      .catch((error) => (!isCanceled && reject(error)));
+      .then((value) => !isCanceled && resolve(value))
+      .catch((error) => !isCanceled && reject(error));
   });
 
   return {
     promise: cancellablePromise,
     cancel() {
       isCanceled = true;
-    }
+    },
   };
 }
 
@@ -170,7 +184,7 @@ function useCancellablePromise() {
     promises.current = [];
 
     return () => {
-      promises.current.forEach(p => p.cancel());
+      promises.current.forEach((p) => p.cancel());
       promises.current = [];
     };
   }, []);
@@ -192,9 +206,7 @@ function useCancellablePromise() {
  * @param {*} fallbackState
  */
 const useLocalStorage = (storageKey, fallbackState) => {
-  const [value, setValue] = useState(
-    JSON.parse(localStorage.getItem(storageKey)) ?? fallbackState
-  );
+  const [value, setValue] = useState(JSON.parse(localStorage.getItem(storageKey)) ?? fallbackState);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(value));
@@ -333,10 +345,11 @@ const remoteConnection = (...args) => !localConnection(...args);
  */
 const timezoneTime = (timezone, { date = new Date() }) => {
   try {
-    const formatter = new Intl.DateTimeFormat(
-      "en-US",
-      { timeZone: timezone, timeStyle: "short", hour12: false }
-    );
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeStyle: "short",
+      hour12: false,
+    });
 
     return formatter.format(date);
   } catch (e) {
@@ -355,11 +368,11 @@ const timezoneTime = (timezone, { date = new Date() }) => {
 const timezoneUTCOffset = (timezone) => {
   try {
     const date = new Date();
-    const dateLocaleString = date.toLocaleString(
-      "en-US",
-      { timeZone: timezone, timeZoneName: "short" }
-    );
-    const [timezoneName] = dateLocaleString.split(' ').slice(-1);
+    const dateLocaleString = date.toLocaleString("en-US", {
+      timeZone: timezone,
+      timeZoneName: "short",
+    });
+    const [timezoneName] = dateLocaleString.split(" ").slice(-1);
     const dateString = date.toString();
     const offset = Date.parse(`${dateString} UTC`) - Date.parse(`${dateString} ${timezoneName}`);
 
@@ -373,7 +386,9 @@ const timezoneUTCOffset = (timezone) => {
 
 export {
   noop,
+  identity,
   isObject,
+  isObjectEmpty,
   partition,
   compact,
   uniq,
@@ -388,5 +403,5 @@ export {
   localConnection,
   remoteConnection,
   timezoneTime,
-  timezoneUTCOffset
+  timezoneUTCOffset,
 };

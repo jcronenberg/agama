@@ -40,7 +40,7 @@ BuildRequires:  pkgconfig(pam)
 Requires:       jsonnet
 Requires:       lshw
 # required by "agama logs store"
-Requires:       bzip2
+Requires:       gzip
 Requires:       tar
 # required for translating the keyboards descriptions
 BuildRequires:  xkeyboard-config-lang
@@ -116,6 +116,8 @@ echo $PATH
 %service_del_postun_with_restart agama-web-server.service
 
 %files
+%doc README.md
+%license LICENSE
 %{_bindir}/agama-dbus-server
 %{_bindir}/agama-web-server
 %{_datadir}/dbus-1/agama-services

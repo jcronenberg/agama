@@ -27,7 +27,6 @@ require "agama/storage/device_settings"
 require "agama/storage/manager"
 require "agama/storage/proposal"
 require "agama/storage/proposal_settings"
-require "agama/storage/proposal_settings_conversion"
 require "agama/storage/volume"
 require "agama/storage/iscsi/manager"
 require "agama/storage/dasd/manager"
@@ -120,7 +119,7 @@ describe Agama::DBus::Storage::Manager do
       let(:action1) do
         instance_double(Agama::Storage::Action,
           text:                "test1",
-          device:              device1,
+          device_sid:          1,
           on_btrfs_subvolume?: false,
           delete?:             false,
           resize?:             false)
@@ -129,7 +128,7 @@ describe Agama::DBus::Storage::Manager do
       let(:action2) do
         instance_double(Agama::Storage::Action,
           text:                "test2",
-          device:              device2,
+          device_sid:          2,
           on_btrfs_subvolume?: false,
           delete?:             true,
           resize?:             false)
@@ -138,7 +137,7 @@ describe Agama::DBus::Storage::Manager do
       let(:action3) do
         instance_double(Agama::Storage::Action,
           text:                "test3",
-          device:              device3,
+          device_sid:          3,
           on_btrfs_subvolume?: false,
           delete?:             false,
           resize?:             true)
@@ -147,16 +146,11 @@ describe Agama::DBus::Storage::Manager do
       let(:action4) do
         instance_double(Agama::Storage::Action,
           text:                "test4",
-          device:              device4,
+          device_sid:          4,
           on_btrfs_subvolume?: true,
           delete?:             false,
           resize?:             false)
       end
-
-      let(:device1) { instance_double(Y2Storage::Device, sid: 1) }
-      let(:device2) { instance_double(Y2Storage::Device, sid: 2) }
-      let(:device3) { instance_double(Y2Storage::Device, sid: 3) }
-      let(:device4) { instance_double(Y2Storage::Device, sid: 4) }
 
       it "returns a list with a hash for each action" do
         expect(subject.actions.size).to eq(4)
@@ -522,53 +516,35 @@ describe Agama::DBus::Storage::Manager do
   end
 
   describe "#serialized_storage_config" do
-    context "if the storage config has not been set yet" do
-      context "and a proposal has not been calculated" do
-        it "returns serialized empty storage config" do
-          expect(subject.serialized_storage_config).to eq({}.to_json)
-        end
-      end
+    def pretty_json(value)
+      JSON.pretty_generate(value)
+    end
 
-      context "and a proposal has been calculated" do
-        before do
-          proposal.calculate_guided(settings)
-        end
-
-        let(:settings) do
-          Agama::Storage::ProposalSettings.new.tap do |settings|
-            settings.device = Agama::Storage::DeviceSettings::Disk.new("/dev/vda")
-          end
-        end
-
-        it "returns serialized storage config including guided proposal settings" do
-          expected_config = {
-            storage: {
-              guided: Agama::Storage::ProposalSettingsConversion.to_schema(settings)
-            }
-          }
-
-          expect(subject.serialized_storage_config).to eq(expected_config.to_json)
-        end
+    context "if a proposal has not been calculated" do
+      it "returns serialized empty storage config" do
+        expect(subject.serialized_storage_config).to eq(pretty_json({}))
       end
     end
 
-    context "if the storage config has been set" do
+    context "if a proposal has been calculated" do
       before do
-        subject.apply_storage_config(storage_config.to_json)
+        proposal.calculate_guided(settings)
       end
 
-      let(:storage_config) do
-        {
+      let(:settings) do
+        Agama::Storage::ProposalSettings.new.tap do |settings|
+          settings.device = Agama::Storage::DeviceSettings::Disk.new("/dev/vda")
+        end
+      end
+
+      it "returns serialized storage config including guided proposal settings" do
+        expected_config = {
           storage: {
-            guided: {
-              disk: "/dev/vdc"
-            }
+            guided: settings.to_json_settings
           }
         }
-      end
 
-      it "returns the serialized storage config" do
-        expect(subject.serialized_storage_config).to eq(storage_config.to_json)
+        expect(subject.serialized_storage_config).to eq(pretty_json(expected_config))
       end
     end
   end
@@ -622,9 +598,7 @@ describe Agama::DBus::Storage::Manager do
 
         it "returns a Hash with success, strategy and settings" do
           result = subject.proposal_result
-          serialized_settings = Agama::Storage::ProposalSettingsConversion
-            .to_schema(proposal.settings)
-            .to_json
+          serialized_settings = proposal.settings.to_json_settings.to_json
 
           expect(result.keys).to contain_exactly("success", "strategy", "settings")
           expect(result["success"]).to eq(true)

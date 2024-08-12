@@ -23,46 +23,62 @@ import React, { useEffect, useState } from "react";
 import {
   Card,
   CardBody,
+  Flex,
   Grid,
   GridItem,
-  ProgressStepper,
   ProgressStep,
+  ProgressStepper,
   Spinner,
   Stack,
+  Truncate,
 } from "@patternfly/react-core";
 
 import { _ } from "~/i18n";
 import { Center } from "~/components/layout";
-import { useInstallerClient } from "~/context/installer";
+import { useProgress, useProgressChanges, useResetProgress } from "~/queries/progress";
 
 const Progress = ({ steps, step, firstStep, detail }) => {
-  const variant = (index) => {
-    if (index < step.current) return "success";
-    if (index === step.current) return "info";
-    if (index > step.current) return "pending";
-  };
-
   const stepProperties = (stepNumber) => {
     const properties = {
-      variant: variant(stepNumber),
       isCurrent: stepNumber === step.current,
       id: `step-${stepNumber}-id`,
       titleId: `step-${stepNumber}-title`,
     };
 
+    if (stepNumber > step.current) {
+      properties.variant = "pending";
+      properties.description = <div>{_("Pending")}</div>;
+    }
+
     if (properties.isCurrent) {
-      properties.icon = <Spinner />;
+      properties.variant = "info";
       if (detail && detail.message !== "") {
         const { message, current, total } = detail;
-        properties.description = `${message} (${current}/${total})`;
+        properties.description = (
+          <Stack hasGutter>
+            <div>{_("In progress")}</div>
+            <div>
+              <Truncate
+                content={`${message} (${current}/${total})`}
+                trailingNumChars={12}
+                position="middle"
+              />
+            </div>
+          </Stack>
+        );
       }
+    }
+
+    if (stepNumber < step.current || step.finished) {
+      properties.variant = "success";
+      properties.description = <div>{_("Finished")}</div>;
     }
 
     return properties;
   };
 
   return (
-    <ProgressStepper isCenterAligned>
+    <ProgressStepper isCenterAligned className="progress-report">
       {firstStep && (
         <ProgressStep key="initial" variant="success">
           {firstStep}
@@ -79,59 +95,60 @@ const Progress = ({ steps, step, firstStep, detail }) => {
   );
 };
 
+function findDetail(progresses) {
+  return progresses.find((progress) => {
+    return progress?.finished === false;
+  });
+}
+
 /**
  * @component
  *
  * Shows progress steps when a product is selected.
  */
 function ProgressReport({ title, firstStep }) {
-  const { manager, storage, software } = useInstallerClient();
-  const [steps, setSteps] = useState();
-  const [step, setStep] = useState();
-  const [detail, setDetail] = useState();
-
-  useEffect(() => software.onProgressChange(setDetail), [software, setDetail]);
-  useEffect(() => storage.onProgressChange(setDetail), [storage, setDetail]);
+  useResetProgress();
+  const progress = useProgress("manager", { suspense: true });
+  const [steps, setSteps] = useState(progress.steps);
+  const softwareProgress = useProgress("software");
+  const storageProgress = useProgress("storage");
+  useProgressChanges();
 
   useEffect(() => {
-    manager.getProgress().then((progress) => {
-      setSteps(progress.steps);
-      setStep(progress);
-    });
+    if (progress.steps.length === 0) return;
 
-    return manager.onProgressChange(setStep);
-  }, [manager, setSteps]);
+    setSteps(progress.steps);
+  }, [progress, steps]);
+  const detail = findDetail([softwareProgress, storageProgress]);
 
-  const Content = () => {
-    if (!steps) {
-      return;
-    }
+  const Content = () => (
+    <Progress
+      titleId="progress-title"
+      steps={steps}
+      step={progress}
+      detail={detail}
+      firstStep={firstStep}
+      currentStep={false}
+    />
+  );
 
-    return (
-      <Progress
-        titleId="progress-title"
-        steps={steps}
-        step={step}
-        detail={detail}
-        firstStep={firstStep}
-        currentStep={false}
-      />
-    );
-  };
-
-  const progressTitle = !steps ? _("Waiting for progress status...") : title;
   return (
     <Center>
       <Grid hasGutter>
-        <GridItem sm={8} smOffset={2}>
+        <GridItem sm={10} smOffset={1}>
           <Card isPlain>
             <CardBody>
-              <Stack hasGutter>
+              <Flex
+                direction={{ default: "column" }}
+                rowGap={{ default: "rowGap2xl" }}
+                alignItems={{ default: "alignItemsCenter" }}
+              >
+                <Spinner size="xl" />
                 <h1 id="progress-title" style={{ textAlign: "center" }}>
-                  {progressTitle}
+                  {title}
                 </h1>
                 <Content />
-              </Stack>
+              </Flex>
             </CardBody>
           </Card>
         </GridItem>
