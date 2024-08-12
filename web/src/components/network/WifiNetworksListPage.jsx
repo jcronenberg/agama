@@ -22,23 +22,38 @@
 import React from "react";
 import {
   Button,
-  Card, CardBody,
-  DataList, DataListCell, DataListItem, DataListItemCells, DataListItemRow,
-  Drawer, DrawerActions, DrawerCloseButton, DrawerContent, DrawerContentBody, DrawerHead, DrawerPanelBody, DrawerPanelContent,
+  Card,
+  CardBody,
+  DataList,
+  DataListCell,
+  DataListItem,
+  DataListItemCells,
+  DataListItemRow,
+  Drawer,
+  DrawerActions,
+  DrawerCloseButton,
+  DrawerContent,
+  DrawerContentBody,
+  DrawerHead,
+  DrawerPanelBody,
+  DrawerPanelContent,
   Flex,
   Label,
   Spinner,
   Split,
-  Stack
+  Stack,
 } from "@patternfly/react-core";
+import { generatePath } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "~/components/layout";
 import { WifiConnectionForm } from "~/components/network";
-import { ButtonLink, EmptyState } from "~/components/core";
+import { ButtonLink } from "~/components/core";
 import { DeviceState } from "~/client/network/model";
-import { useInstallerClient } from "~/context/installer";
-import { _ } from "~/i18n";
 import { formatIp } from "~/client/network/utils";
-import { sprintf } from "sprintf-js";
+import { useInstallerClient } from "~/context/installer";
+import { useSelectedWifi, useSelectedWifiChange } from "~/queries/network";
+import { PATHS } from "~/routes/network";
+import { _ } from "~/i18n";
 
 const HIDDEN_NETWORK = Object.freeze({ hidden: true });
 
@@ -70,18 +85,16 @@ const connectionAddresses = (network) => {
 };
 
 const ConnectionData = ({ network }) => {
-  return (
-    <Stack hasGutter>
-      {connectionAddresses(network)}
-    </Stack>
-  );
+  return <Stack hasGutter>{connectionAddresses(network)}</Stack>;
 };
 
-const WifiDrawerPanelBody = ({ network, onCancel, onForget }) => {
+const WifiDrawerPanelBody = ({ network, onCancel }) => {
   const client = useInstallerClient();
+  const queryClient = useQueryClient();
+  const { data } = useSelectedWifi();
   const forgetNetwork = async () => {
     await client.network.deleteConnection(network.settings.id);
-    onForget();
+    queryClient.invalidateQueries({ queryKey: ["network", "connections"] });
   };
 
   if (!network) return;
@@ -90,13 +103,15 @@ const WifiDrawerPanelBody = ({ network, onCancel, onForget }) => {
 
   if (network === HIDDEN_NETWORK) return <Form />;
 
+  if (data.needsAuth) return <Form />;
+
   if (network.settings && !network.device) {
     return (
       <Split hasGutter>
         <ButtonLink onClick={async () => await client.network.connectTo(network.settings)}>
           {_("Connect")}
         </ButtonLink>
-        <ButtonLink to={`/network/connections/${network.settings.id}/edit`}>
+        <ButtonLink to={generatePath(PATHS.editConnection, { id: network.settings.id })}>
           {_("Edit")}
         </ButtonLink>
         <Button variant="secondary" isDanger onClick={forgetNetwork}>
@@ -120,10 +135,14 @@ const WifiDrawerPanelBody = ({ network, onCancel, onForget }) => {
             <ButtonLink onClick={async () => await client.network.disconnect(network.settings)}>
               {_("Disconnect")}
             </ButtonLink>
-            <ButtonLink to={`/network/connections/${network.settings.id}/edit`}>
+            <ButtonLink to={generatePath(PATHS.editConnection, { id: network.settings.id })}>
               {_("Edit")}
             </ButtonLink>
-            <Button variant="secondary" isDanger onClick={async () => await client.network.deleteConnection(network.settings.id)}>
+            <Button
+              variant="secondary"
+              isDanger
+              onClick={async () => await client.network.deleteConnection(network.settings.id)}
+            >
               {_("Forget")}
             </Button>
           </Split>
@@ -137,11 +156,7 @@ const WifiDrawerPanelBody = ({ network, onCancel, onForget }) => {
 const NetworkFormName = ({ network }) => {
   if (!network) return;
 
-  return (
-    <h3>
-      {network === HIDDEN_NETWORK ? _("Connect to a hidden network") : network.ssid}
-    </h3>
-  );
+  return <h3>{network === HIDDEN_NETWORK ? _("Connect to a hidden network") : network.ssid}</h3>;
 };
 
 const NetworkListName = ({ network }) => {
@@ -150,8 +165,16 @@ const NetworkListName = ({ network }) => {
   return (
     <Flex columnGap={{ default: "columnGapXs" }}>
       <b>{network.ssid}</b>
-      {network.settings && <Label isCompact color="cyan" variant="outline">{_("configured")}</Label>}
-      {state === _("Connected") && <Label isCompact color="green">{state}</Label>}
+      {network.settings && (
+        <Label isCompact color="cyan" variant="outline">
+          {_("configured")}
+        </Label>
+      )}
+      {state === _("Connected") && (
+        <Label isCompact color="green">
+          {state}
+        </Label>
+      )}
     </Flex>
   );
 };
@@ -166,26 +189,26 @@ const NetworkListName = ({ network }) => {
  * @param {function} props.onSelectionCallback - the function to trigger when user selects a network
  * @param {function} props.onCancelCallback - the function to trigger when user cancel dismiss before connecting to a network
  */
-function WifiNetworksListPage({
-  selected,
-  onSelectionChange,
-  networks = [],
-  forceUpdateNetworksCallback = () => { }
-}) {
-  const selectHiddenNetwork = () => {
-    onSelectionChange(HIDDEN_NETWORK);
+function WifiNetworksListPage({ networks = [] }) {
+  const { data } = useSelectedWifi();
+  const selected =
+    data.ssid === undefined ? HIDDEN_NETWORK : networks.find((n) => n.ssid === data.ssid);
+  const changeSelected = useSelectedWifiChange();
+
+  const selectHiddneNetwork = () => {
+    changeSelected.mutate({ ssid: undefined, needsAuth: null });
   };
 
   const selectNetwork = (ssid) => {
-    onSelectionChange(networks.find(n => n.ssid === ssid));
+    changeSelected.mutate({ ssid, needsAuth: null });
   };
 
   const unselectNetwork = () => {
-    onSelectionChange(undefined);
+    changeSelected.mutate({ ssid: null, needsAuth: null });
   };
 
   const renderElements = () => {
-    return networks.map(n => {
+    return networks.map((n) => {
       return (
         <DataListItem id={n.ssid} key={n.ssid}>
           <DataListItemRow>
@@ -194,12 +217,19 @@ function WifiNetworksListPage({
                 <DataListCell key="ssid">
                   <Flex direction={{ default: "column" }} rowGap={{ default: "rowGapSm" }}>
                     <NetworkListName network={n} />
-                    <Flex alignItems={{ default: "alignItemsCenter" }} columnGap={{ default: "columnGapSm" }}>
-                      <div><Icon name="lock" size="10" fill="grey" /> {n.security.join(", ")}</div>
-                      <div><Icon name="signal_cellular_alt" size="10" fill="grey" /> {n.strength}</div>
+                    <Flex
+                      alignItems={{ default: "alignItemsCenter" }}
+                      columnGap={{ default: "columnGapSm" }}
+                    >
+                      <div>
+                        <Icon name="lock" size="10" fill="grey" /> {n.security.join(", ")}
+                      </div>
+                      <div>
+                        <Icon name="signal_cellular_alt" size="10" fill="grey" /> {n.strength}
+                      </div>
                     </Flex>
                   </Flex>
-                </DataListCell>
+                </DataListCell>,
               ]}
             />
           </DataListItemRow>
@@ -222,11 +252,7 @@ function WifiNetworksListPage({
                   </DrawerActions>
                 </DrawerHead>
                 <DrawerPanelBody>
-                  <WifiDrawerPanelBody
-                    network={selected}
-                    onCancel={unselectNetwork}
-                    onForget={forceUpdateNetworksCallback}
-                  />
+                  <WifiDrawerPanelBody network={selected} onCancel={unselectNetwork} />
                 </DrawerPanelBody>
               </DrawerPanelContent>
             }
@@ -240,7 +266,7 @@ function WifiNetworksListPage({
                 >
                   {renderElements()}
                 </DataList>
-                <Button variant="link" onClick={selectHiddenNetwork}>
+                <Button variant="link" onClick={selectHiddneNetwork}>
                   {_("Connect to hidden network")}
                 </Button>
               </Stack>

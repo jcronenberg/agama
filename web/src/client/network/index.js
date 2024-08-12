@@ -26,6 +26,8 @@ import {
   ConnectionTypes,
   createAccessPoint,
   createConnection,
+  DeviceState,
+  NetworkState,
   securityFromFlags,
 } from "./model";
 import { formatIp, ipPrefixFor } from "./utils";
@@ -35,7 +37,7 @@ const DeviceType = Object.freeze({
   ETHERNET: 1,
   WIRELESS: 2,
   DUMMY: 3,
-  BOND: 4
+  BOND: 4,
 });
 
 /**
@@ -54,7 +56,7 @@ const NetworkEventTypes = Object.freeze({
   CONNECTION_ADDED: "connectionAdded",
   CONNECTION_UPDATED: "connectionUpdated",
   CONNECTION_REMOVED: "connectionRemoved",
-  SETTINGS_UPDATED: "settingsUpdated"
+  SETTINGS_UPDATED: "settingsUpdated",
 });
 
 /**
@@ -119,18 +121,20 @@ class NetworkClient {
    * @return {Device}
    */
   fromApiDevice(device) {
-    const nameservers = (device?.ipConfig?.nameservers || []);
+    const nameservers = device?.ipConfig?.nameservers || [];
     const { ipConfig = {}, ...dev } = device;
     const routes4 = (ipConfig.routes4 || []).map((route) => {
       const [ip, netmask] = route.destination.split("/");
-      const destination = (netmask !== undefined) ? { address: ip, prefix: ipPrefixFor(netmask) } : { address: ip };
+      const destination =
+        netmask !== undefined ? { address: ip, prefix: ipPrefixFor(netmask) } : { address: ip };
 
       return { ...route, destination };
     });
 
     const routes6 = (ipConfig.routes6 || []).map((route) => {
       const [ip, netmask] = route.destination.split("/");
-      const destination = (netmask !== undefined) ? { address: ip, prefix: ipPrefixFor(netmask) } : { address: ip };
+      const destination =
+        netmask !== undefined ? { address: ip, prefix: ipPrefixFor(netmask) } : { address: ip };
 
       return { ...route, destination };
     });
@@ -164,7 +168,7 @@ class NetworkClient {
   }
 
   fromApiConnection(connection) {
-    const nameservers = (connection.nameservers || []);
+    const nameservers = connection.nameservers || [];
     const addresses = (connection.addresses || []).map((address) => {
       const [ip, netmask] = address.split("/");
       if (netmask !== undefined) {
@@ -214,7 +218,7 @@ class NetworkClient {
         ssid: ap.ssid,
         hwAddress: ap.hw_address,
         strength: ap.strength,
-        security: securityFromFlags(ap.flags, ap.wpaFlags, ap.rsnFlags)
+        security: securityFromFlags(ap.flags, ap.wpaFlags, ap.rsnFlags),
       });
     });
   }
@@ -237,36 +241,58 @@ class NetworkClient {
     return this.client.get(`/network/connections/${connection.id}/disconnect`);
   }
 
-  async loadNetworks(devices, connections, accessPoints) {
+  networkStateFor(state) {
+    switch (state) {
+      case DeviceState.CONFIG:
+      case DeviceState.IPCHECK:
+        // TRANSLATORS: Wifi network status
+        return NetworkState.CONNECTING;
+      case DeviceState.ACTIVATED:
+        // TRANSLATORS: Wifi network status
+        return NetworkState.CONNECTED;
+      case DeviceState.DEACTIVATING:
+      case DeviceState.FAILED:
+      case DeviceState.DISCONNECTED:
+        // TRANSLATORS: Wifi network status
+        return NetworkState.DISCONNECTED;
+      default:
+        return "";
+    }
+  }
+
+  loadNetworks(devices, connections, accessPoints) {
     const knownSsids = [];
 
     return accessPoints
       .sort((a, b) => b.strength - a.strength)
-      .reduce((networks, ap) => {
-        // Do not include networks without SSID
-        if (!ap.ssid || ap.ssid === "") return networks;
-        // Do not include "duplicates"
-        if (knownSsids.includes(ap.ssid)) return networks;
+      .reduce(
+        (networks, ap) => {
+          // Do not include networks without SSID
+          if (!ap.ssid || ap.ssid === "") return networks;
+          // Do not include "duplicates"
+          if (knownSsids.includes(ap.ssid)) return networks;
 
-        const network = {
-          ...ap,
-          settings: connections.find(c => c.wireless?.ssid === ap.ssid),
-          device: devices.find(c => c.connection === ap.ssid)
-        };
+          const network = {
+            ...ap,
+            settings: connections.find((c) => c.wireless?.ssid === ap.ssid),
+            device: devices.find((c) => c.connection === ap.ssid),
+          };
 
-        // Group networks
-        if (network.device) {
-          networks.connected.push(network);
-        } else if (network.settings) {
-          networks.configured.push(network);
-        } else {
-          networks.others.push(network);
-        }
+          // Group networks
+          if (network.device) {
+            networks.connected.push(network);
+          } else if (network.settings) {
+            networks.configured.push(network);
+          } else {
+            networks.others.push(network);
+          }
 
-        knownSsids.push(network.ssid);
+          knownSsids.push(network.ssid);
 
-        return networks;
-      }, { connected: [], configured: [], others: [] });
+          return networks;
+        },
+        { connected: [], configured: [], others: [] },
+      );
   }
 
   /**
@@ -312,7 +338,10 @@ class NetworkClient {
    * @return {Promise<Connection>} the added connection
    */
   async addConnection(connection) {
-    const response = await this.client.post("/network/connections", this.toApiConnection(connection));
+    const response = await this.client.post(
+      "/network/connections",
+      this.toApiConnection(connection),
+    );
     if (!response.ok) {
       console.error("Failed to post list of connections", response);
       return null;
@@ -371,14 +400,14 @@ class NetworkClient {
    */
   async addresses() {
     const conns = await this.connections();
-    return conns.flatMap(c => c.addresses);
+    return conns.flatMap((c) => c.addresses);
   }
 
   /*
-  * Returns network general settings
-  *
+   * Returns network general settings
+   *
    * @return {Promise<NetworkSettings>}
-  */
+   */
   async settings() {
     const response = await this.client.get("/network/state");
     if (!response.ok) {
@@ -410,9 +439,4 @@ class NetworkClient {
   }
 }
 
-export {
-  ConnectionState,
-  ConnectionTypes,
-  NetworkClient,
-  NetworkEventTypes
-};
+export { ConnectionState, ConnectionTypes, NetworkClient, NetworkEventTypes };
