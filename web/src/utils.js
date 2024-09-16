@@ -50,6 +50,37 @@ const isObjectEmpty = (value) => {
 };
 
 /**
+ * Whether given value is empty or not
+ *
+ * @param {object} value - the value to be checked
+ * @return {boolean} false if value is a function, a not empty object, or a not
+ *                   empty string; true otherwise
+ */
+const isEmpty = (value) => {
+  if (value === null || value === undefined) {
+    return true;
+  }
+
+  if (typeof value === "number" && !Number.isNaN(value)) {
+    return false;
+  }
+
+  if (typeof value === "function") {
+    return false;
+  }
+
+  if (typeof value === "string") {
+    return value.trim() === "";
+  }
+
+  if (isObject(value)) {
+    return isObjectEmpty(value);
+  }
+
+  return true;
+};
+
+/**
  * Returns an empty function useful to be used as a default callback.
  *
  * @return {function} empty function
@@ -82,7 +113,6 @@ const partition = (collection, filter) => {
 
 /**
  * Generates a new array without null and undefined values.
- * @function
  *
  * @param {Array} collection
  * @returns {Array}
@@ -93,7 +123,6 @@ function compact(collection) {
 
 /**
  * Generates a new array without duplicates.
- * @function
  *
  * @param {Array} collection
  * @returns {Array}
@@ -116,6 +145,37 @@ function uniq(collection) {
  */
 function classNames(...classes) {
   return classes.filter((item) => !!item).join(" ");
+}
+
+/**
+ * Convert any string into a slug
+ *
+ * Borrowed from https://jasonwatmore.com/vanilla-js-slugify-a-string-in-javascript
+ *
+ * @example
+ * slugify("Agama! / Network 1");
+ * // returns "agama-network-1"
+ *
+ * @param {string} input - the string to slugify
+ * @returns {string} - the slug
+ */
+function slugify(input) {
+  if (!input) return "";
+
+  return (
+    input
+      // make lower case and trim
+      .toLowerCase()
+      .trim()
+      // remove accents from charaters
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      // replace invalid chars with spaces
+      .replace(/[^a-z0-9\s-]/g, " ")
+      .trim()
+      // replace multiple spaces or hyphens with a single hyphen
+      .replace(/[\s-]+/g, "-")
+  );
 }
 
 /**
@@ -217,7 +277,6 @@ const useLocalStorage = (storageKey, fallbackState) => {
 
 /**
  * Debounce hook.
- * @function
  *
  * Source {@link https://designtechworld.medium.com/create-a-custom-debounce-hook-in-react-114f3f245260}
  *
@@ -256,6 +315,10 @@ const useDebounce = (callback, delay) => {
   return debouncedCallback;
 };
 
+/**
+ * @param {string}
+ * @returns {number}
+ */
 const hex = (value) => {
   const sanitizedValue = value.replaceAll(".", "");
   return parseInt(sanitizedValue, 16);
@@ -263,18 +326,16 @@ const hex = (value) => {
 
 /**
  * Converts an issue to a validation error
- * @function
  *
  * @todo This conversion will not be needed after adapting Section to directly work with issues.
  *
- * @param {import("~/client/mixins").Issue} issue
+ * @param {import("~/types/issues").Issue} issue
  * @returns {import("~/client/mixins").ValidationError}
  */
 const toValidationError = (issue) => ({ message: issue.description });
 
 /**
  * Wrapper around window.location.reload
- * @function
  *
  * It's needed mainly to ease testing because we can't override window in jest with jsdom anymore
  *
@@ -288,7 +349,6 @@ const locationReload = () => {
 
 /**
  * Wrapper around window.location.search setter
- * @function
  *
  * It's needed mainly to ease testing as we can't override window in jest with jsdom anymore
  *
@@ -387,6 +447,7 @@ const timezoneUTCOffset = (timezone) => {
 export {
   noop,
   identity,
+  isEmpty,
   isObject,
   isObjectEmpty,
   partition,
@@ -402,6 +463,7 @@ export {
   setLocationSearch,
   localConnection,
   remoteConnection,
+  slugify,
   timezoneTime,
   timezoneUTCOffset,
 };

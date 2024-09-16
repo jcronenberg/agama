@@ -18,8 +18,8 @@ use zbus::Connection;
 pub struct Store<'a> {
     users: UsersStore,
     network: NetworkStore,
-    product: ProductStore<'a>,
-    software: SoftwareStore<'a>,
+    product: ProductStore,
+    software: SoftwareStore,
     storage: StorageStore<'a>,
     localization: LocalizationStore,
 }
@@ -33,8 +33,8 @@ impl<'a> Store<'a> {
             localization: LocalizationStore::new()?,
             users: UsersStore::new()?,
             network: NetworkStore::new(http_client).await?,
-            product: ProductStore::new(connection.clone()).await?,
-            software: SoftwareStore::new(connection.clone()).await?,
+            product: ProductStore::new()?,
+            software: SoftwareStore::new()?,
             storage: StorageStore::new(connection).await?,
         })
     }

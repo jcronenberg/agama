@@ -12,10 +12,12 @@ use crate::{
         Event,
     },
 };
+
 use agama_lib::{
     error::ServiceError,
-    product::{proxies::RegistrationProxy, Product, ProductClient, RegistrationRequirement},
+    product::{proxies::RegistrationProxy, Product, ProductClient},
     software::{
+        model::{RegistrationInfo, RegistrationParams, SoftwareConfig},
         proxies::{Software1Proxy, SoftwareProductProxy},
         Pattern, SelectedBy, SoftwareClient, UnknownSelectedBy,
     },
@@ -35,15 +37,6 @@ use tokio_stream::{Stream, StreamExt};
 struct SoftwareState<'a> {
     product: ProductClient<'a>,
     software: SoftwareClient<'a>,
-}
-
-/// Software service configuration (product, patterns, etc.).
-#[derive(Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct SoftwareConfig {
-    /// A map where the keys are the pattern names and the values whether to install them or not.
-    patterns: Option<HashMap<String, bool>>,
-    /// Name of the product to install.
-    product: Option<String>,
 }
 
 /// Returns an stream that emits software related events coming from D-Bus.
@@ -237,19 +230,6 @@ async fn products(State(state): State<SoftwareState<'_>>) -> Result<Json<Vec<Pro
     Ok(Json(products))
 }
 
-/// Information about registration configuration (product, patterns, etc.).
-#[derive(Clone, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct RegistrationInfo {
-    /// Registration key. Empty value mean key not used or not registered.
-    key: String,
-    /// Registration email. Empty value mean email not used or not registered.
-    email: String,
-    /// if registration is required, optional or not needed for current product.
-    /// Change only if selected product is changed.
-    requirement: RegistrationRequirement,
-}
-
 /// returns registration info
 ///
 /// * `state`: service state.
@@ -273,15 +253,6 @@ async fn get_registration(
     Ok(Json(result))
 }
 
-/// Software service configuration (product, patterns, etc.).
-#[derive(Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct RegistrationParams {
-    /// Registration key.
-    key: String,
-    /// Registration email.
-    email: String,
-}
-
 #[derive(Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct FailureDetails {
     /// ID of error. See dbus API for possible values
@@ -289,6 +260,7 @@ pub struct FailureDetails {
     /// human readable error string intended to be displayed to user
     message: String,
 }
+
 /// Register product
 ///
 /// * `state`: service state.

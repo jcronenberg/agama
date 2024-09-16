@@ -51,6 +51,7 @@ $SUDO $ZYPPER install \
 # TODO extract list from gem2rpm.yml
 $SUDO $ZYPPER install \
   dbus-1-common \
+  dbus-1-daemon \
   suseconnect-ruby-bindings \
   autoyast2-installation \
   yast2 \
@@ -111,11 +112,17 @@ fi
       # we are in a container, told to use that one
       # instead of a released version
       # edit +Gemfile and -gemspec
-      sed -e '/ruby-dbus/d' -i Gemfile agama.gemspec
+      sed -e '/ruby-dbus/d' -i Gemfile agama-yast.gemspec
       sed -e '/gemspec/a gem "ruby-dbus", path: "/checkout-ruby-dbus"' -i Gemfile
   fi
 
-  bundle config set --local path 'vendor/bundle'
+  if [ -n "$CI" ]; then
+    # in CI reuse the pre-installed system gems from RPMs
+    bundle config set --local disable_shared_gems 0
+  else
+    bundle config set --local path 'vendor/bundle'
+  fi
+
   bundle install
 )
 
@@ -139,6 +146,8 @@ $SUDO $ZYPPER install \
 (
   cd $MYDIR/rust
   cargo build
+
+  ln -st /usr/bin $MYDIR/rust/target/debug/agama{,*server}
 )
 
 # - D-Bus configuration
@@ -182,6 +191,9 @@ $SUDO cp -v $MYDIR/service/share/dbus.conf /usr/share/dbus-1/agama.conf
 $SUDO mkdir -p /usr/share/agama/products.d
 $SUDO cp -f $MYDIR/products.d/*.yaml /usr/share/agama/products.d
 
+# - Make sure NetworkManager is running
+$SUDO systemctl start NetworkManager
+
 # systemd reload and start of service
 (
   $SUDO systemctl daemon-reload
@@ -190,6 +202,3 @@ $SUDO cp -f $MYDIR/products.d/*.yaml /usr/share/agama/products.d
   # Start the web server
   $SUDO systemctl start agama-web-server.service
 )
-
-# - Make sure NetworkManager is running
-$SUDO systemctl start NetworkManager
