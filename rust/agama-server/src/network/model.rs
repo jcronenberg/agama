@@ -3,7 +3,9 @@
 //! * This module contains the types that represent the network concepts. They are supposed to be
 //! agnostic from the real network service (e.g., NetworkManager).
 use crate::network::error::NetworkStateError;
-use agama_lib::network::settings::{BondSettings, NetworkConnection, WirelessSettings};
+use agama_lib::network::settings::{
+    BondSettings, IEEE8021XSettings, NetworkConnection, WirelessSettings,
+};
 use agama_lib::network::types::{BondMode, DeviceState, DeviceType, Status, SSID};
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};
@@ -490,6 +492,7 @@ pub struct Connection {
     pub port_config: PortConfig,
     pub match_config: MatchConfig,
     pub config: ConnectionConfig,
+    pub ieee_8021x_config: Option<IEEE8021XConfig>,
 }
 
 impl Connection {
@@ -560,6 +563,7 @@ impl Default for Connection {
             port_config: Default::default(),
             match_config: Default::default(),
             config: Default::default(),
+            ieee_8021x_config: Default::default(),
         }
     }
 }
@@ -599,6 +603,10 @@ impl TryFrom<NetworkConnection> for Connection {
             connection.config = config.into();
         }
 
+        if let Some(ieee_8021x_config) = conn.ieee_8021x {
+            connection.ieee_8021x_config = Some(IEEE8021XConfig::try_from(ieee_8021x_config)?);
+        }
+
         connection.ip_config.addresses = conn.addresses;
         connection.ip_config.nameservers = conn.nameservers;
         connection.ip_config.dns_searchlist = conn.dns_searchlist;
@@ -629,6 +637,9 @@ impl TryFrom<Connection> for NetworkConnection {
         let interface = conn.interface;
         let status = Some(conn.status);
         let mtu = conn.mtu;
+        let ieee_8021x: Option<IEEE8021XSettings> = conn
+            .ieee_8021x_config
+            .and_then(|x| IEEE8021XSettings::try_from(x).ok());
 
         let mut connection = NetworkConnection {
             id,
@@ -644,6 +655,7 @@ impl TryFrom<Connection> for NetworkConnection {
             interface,
             addresses,
             mtu,
+            ieee_8021x,
             ..Default::default()
         };
 
@@ -959,13 +971,19 @@ pub struct WirelessConfig {
     pub security: SecurityProtocol,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub band: Option<WirelessBand>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub channel: Option<u32>,
+    pub channel: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bssid: Option<macaddr::MacAddr6>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wep_security: Option<WEPSecurity>,
     pub hidden: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub group_algorithms: Vec<GroupAlgorithm>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub pairwise_algorithms: Vec<PairwiseAlgorithm>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub wpa_protocol_versions: Vec<WPAProtocolVersion>,
+    pub pmf: i32,
 }
 
 impl TryFrom<ConnectionConfig> for WirelessConfig {
@@ -986,11 +1004,60 @@ impl TryFrom<WirelessSettings> for WirelessConfig {
         let ssid = SSID(settings.ssid.as_bytes().into());
         let mode = WirelessMode::try_from(settings.mode.as_str())?;
         let security = SecurityProtocol::try_from(settings.security.as_str())?;
+        let band = if let Some(band) = &settings.band {
+            Some(
+                WirelessBand::try_from(band.as_str())
+                    .map_err(|_| NetworkStateError::InvalidWirelessBand(band.to_string()))?,
+            )
+        } else {
+            None
+        };
+        let bssid = if let Some(bssid) = &settings.bssid {
+            Some(
+                macaddr::MacAddr6::from_str(bssid)
+                    .map_err(|_| NetworkStateError::InvalidBssid(bssid.to_string()))?,
+            )
+        } else {
+            None
+        };
+        let group_algorithms = settings
+            .group_algorithms
+            .iter()
+            .map(|x| {
+                GroupAlgorithm::from_str(x)
+                    .map_err(|_| NetworkStateError::InvalidGroupAlgorithm(x.to_string()))
+            })
+            .collect::<Result<Vec<GroupAlgorithm>, NetworkStateError>>()?;
+        let pairwise_algorithms = settings
+            .pairwise_algorithms
+            .iter()
+            .map(|x| {
+                PairwiseAlgorithm::from_str(x)
+                    .map_err(|_| NetworkStateError::InvalidGroupAlgorithm(x.to_string()))
+            })
+            .collect::<Result<Vec<PairwiseAlgorithm>, NetworkStateError>>()?;
+        let wpa_protocol_versions = settings
+            .wpa_protocol_versions
+            .iter()
+            .map(|x| {
+                WPAProtocolVersion::from_str(x)
+                    .map_err(|_| NetworkStateError::InvalidGroupAlgorithm(x.to_string()))
+            })
+            .collect::<Result<Vec<WPAProtocolVersion>, NetworkStateError>>()?;
+
         Ok(WirelessConfig {
             ssid,
             mode,
             security,
             password: settings.password,
+            band,
+            channel: settings.channel,
+            bssid,
+            hidden: settings.hidden,
+            group_algorithms,
+            pairwise_algorithms,
+            wpa_protocol_versions,
+            pmf: settings.pmf,
             ..Default::default()
         })
     }
@@ -1000,11 +1067,37 @@ impl TryFrom<WirelessConfig> for WirelessSettings {
     type Error = NetworkStateError;
 
     fn try_from(wireless: WirelessConfig) -> Result<Self, Self::Error> {
+        let band = wireless.band.map(|x| x.to_string());
+        let bssid = wireless.bssid.map(|x| x.to_string());
+        let group_algorithms = wireless
+            .group_algorithms
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>();
+        let pairwise_algorithms = wireless
+            .pairwise_algorithms
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>();
+        let wpa_protocol_versions = wireless
+            .wpa_protocol_versions
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>();
+
         Ok(WirelessSettings {
             ssid: wireless.ssid.to_string(),
             mode: wireless.mode.to_string(),
             security: wireless.security.to_string(),
             password: wireless.password,
+            band,
+            channel: wireless.channel,
+            bssid,
+            hidden: wireless.hidden,
+            group_algorithms,
+            pairwise_algorithms,
+            wpa_protocol_versions,
+            pmf: wireless.pmf,
         })
     }
 }
@@ -1090,6 +1183,108 @@ impl TryFrom<&str> for SecurityProtocol {
                 value.to_string(),
             )),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub enum GroupAlgorithm {
+    Wep40,
+    Wep104,
+    Tkip,
+    Ccmp,
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid group algorithm: {0}")]
+pub struct InvalidGroupAlgorithm(String);
+
+impl FromStr for GroupAlgorithm {
+    type Err = InvalidGroupAlgorithm;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "wep40" => Ok(GroupAlgorithm::Wep40),
+            "wep104" => Ok(GroupAlgorithm::Wep104),
+            "tkip" => Ok(GroupAlgorithm::Tkip),
+            "ccmp" => Ok(GroupAlgorithm::Ccmp),
+            _ => Err(InvalidGroupAlgorithm(value.to_string())),
+        }
+    }
+}
+
+impl fmt::Display for GroupAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match &self {
+            GroupAlgorithm::Wep40 => "wep40",
+            GroupAlgorithm::Wep104 => "wep104",
+            GroupAlgorithm::Tkip => "tkip",
+            GroupAlgorithm::Ccmp => "ccmp",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub enum PairwiseAlgorithm {
+    Tkip,
+    Ccmp,
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid pairwise algorithm: {0}")]
+pub struct InvalidPairwiseAlgorithm(String);
+
+impl FromStr for PairwiseAlgorithm {
+    type Err = InvalidPairwiseAlgorithm;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "tkip" => Ok(PairwiseAlgorithm::Tkip),
+            "ccmp" => Ok(PairwiseAlgorithm::Ccmp),
+            _ => Err(InvalidPairwiseAlgorithm(value.to_string())),
+        }
+    }
+}
+
+impl fmt::Display for PairwiseAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match &self {
+            PairwiseAlgorithm::Tkip => "tkip",
+            PairwiseAlgorithm::Ccmp => "ccmp",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub enum WPAProtocolVersion {
+    Wpa,
+    Rsn,
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid WPA protocol version: {0}")]
+pub struct InvalidWPAProtocolVersion(String);
+
+impl FromStr for WPAProtocolVersion {
+    type Err = InvalidWPAProtocolVersion;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "wpa" => Ok(WPAProtocolVersion::Wpa),
+            "rsn" => Ok(WPAProtocolVersion::Rsn),
+            _ => Err(InvalidWPAProtocolVersion(value.to_string())),
+        }
+    }
+}
+
+impl fmt::Display for WPAProtocolVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match &self {
+            WPAProtocolVersion::Wpa => "wpa",
+            WPAProtocolVersion::Rsn => "rsn",
+        };
+        write!(f, "{}", name)
     }
 }
 
@@ -1352,4 +1547,186 @@ pub enum NetworkChange {
     /// original device name, which is especially useful if the
     /// device gets renamed.
     DeviceUpdated(String, Device),
+}
+
+#[derive(Default, Debug, PartialEq, Clone, Serialize)]
+pub struct IEEE8021XConfig {
+    pub eap: Vec<EAPMethod>,
+    pub phase2_auth: Option<Phase2AuthMethod>,
+    pub identity: Option<String>,
+    pub password: Option<String>,
+    pub ca_cert: Option<String>,
+    pub ca_cert_password: Option<String>,
+    pub client_cert: Option<String>,
+    pub client_cert_password: Option<String>,
+    pub private_key: Option<String>,
+    pub private_key_password: Option<String>,
+    pub anonymous_identity: Option<String>,
+    pub peap_version: Option<String>,
+    pub peap_label: bool,
+}
+
+impl TryFrom<IEEE8021XSettings> for IEEE8021XConfig {
+    type Error = NetworkStateError;
+
+    fn try_from(value: IEEE8021XSettings) -> Result<Self, Self::Error> {
+        let eap = value
+            .eap
+            .iter()
+            .map(|x| {
+                EAPMethod::from_str(x)
+                    .map_err(|_| NetworkStateError::InvalidEAPMethod(x.to_string()))
+            })
+            .collect::<Result<Vec<EAPMethod>, NetworkStateError>>()?;
+        let phase2_auth =
+            if let Some(phase2_auth) = &value.phase2_auth {
+                Some(Phase2AuthMethod::from_str(phase2_auth).map_err(|_| {
+                    NetworkStateError::InvalidPhase2AuthMethod(phase2_auth.to_string())
+                })?)
+            } else {
+                None
+            };
+
+        Ok(IEEE8021XConfig {
+            eap,
+            phase2_auth,
+            identity: value.identity,
+            password: value.password,
+            ca_cert: value.ca_cert,
+            ca_cert_password: value.ca_cert_password,
+            client_cert: value.client_cert,
+            client_cert_password: value.client_cert_password,
+            private_key: value.private_key,
+            private_key_password: value.private_key_password,
+            anonymous_identity: value.anonymous_identity,
+            peap_version: value.peap_version,
+            peap_label: value.peap_label,
+        })
+    }
+}
+
+impl TryFrom<IEEE8021XConfig> for IEEE8021XSettings {
+    type Error = NetworkStateError;
+
+    fn try_from(value: IEEE8021XConfig) -> Result<Self, Self::Error> {
+        let eap = value
+            .eap
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>();
+        let phase2_auth = value.phase2_auth.map(|phase2_auth| phase2_auth.to_string());
+
+        Ok(IEEE8021XSettings {
+            eap,
+            phase2_auth,
+            identity: value.identity,
+            password: value.password,
+            ca_cert: value.ca_cert,
+            ca_cert_password: value.ca_cert_password,
+            client_cert: value.client_cert,
+            client_cert_password: value.client_cert_password,
+            private_key: value.private_key,
+            private_key_password: value.private_key_password,
+            anonymous_identity: value.anonymous_identity,
+            peap_version: value.peap_version,
+            peap_label: value.peap_label,
+        })
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid eap method: {0}")]
+pub struct InvalidEAPMethod(String);
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub enum EAPMethod {
+    LEAP,
+    MD5,
+    TLS,
+    PEAP,
+    TTLS,
+    PWD,
+    FAST,
+}
+
+impl FromStr for EAPMethod {
+    type Err = InvalidEAPMethod;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "leap" => Ok(Self::LEAP),
+            "md5" => Ok(Self::MD5),
+            "tls" => Ok(Self::TLS),
+            "peap" => Ok(Self::PEAP),
+            "ttls" => Ok(Self::TTLS),
+            "pwd" => Ok(Self::PWD),
+            "fast" => Ok(Self::FAST),
+            _ => Err(InvalidEAPMethod(s.to_string())),
+        }
+    }
+}
+
+impl fmt::Display for EAPMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match &self {
+            Self::LEAP => "leap",
+            Self::MD5 => "md5",
+            Self::TLS => "tls",
+            Self::PEAP => "peap",
+            Self::TTLS => "ttls",
+            Self::PWD => "pwd",
+            Self::FAST => "fast",
+        };
+        write!(f, "{}", value)
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid phase2-auth method: {0}")]
+pub struct InvalidPhase2AuthMethod(String);
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub enum Phase2AuthMethod {
+    PAP,
+    CHAP,
+    MSCHAP,
+    MSCHAPV2,
+    GTC,
+    OTP,
+    MD5,
+    TLS,
+}
+
+impl FromStr for Phase2AuthMethod {
+    type Err = InvalidPhase2AuthMethod;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "pap" => Ok(Self::PAP),
+            "chap" => Ok(Self::CHAP),
+            "mschap" => Ok(Self::MSCHAP),
+            "mschapv2" => Ok(Self::MSCHAPV2),
+            "gtc" => Ok(Self::GTC),
+            "otp" => Ok(Self::OTP),
+            "md5" => Ok(Self::MD5),
+            "tls" => Ok(Self::TLS),
+            _ => Err(InvalidPhase2AuthMethod(s.to_string())),
+        }
+    }
+}
+
+impl fmt::Display for Phase2AuthMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
+            Self::PAP => "pap",
+            Self::CHAP => "chap",
+            Self::MSCHAP => "mschap",
+            Self::MSCHAPV2 => "mschapv2",
+            Self::GTC => "gtc",
+            Self::OTP => "otp",
+            Self::MD5 => "md5",
+            Self::TLS => "tls",
+        };
+        write!(f, "{}", value)
+    }
 }
