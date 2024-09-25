@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -22,15 +23,12 @@
 // @ts-check
 // cspell:ignore ptable
 
-import { compact, hex, uniq } from "~/utils";
+import { compact, uniq } from "~/utils";
 import { WithStatus } from "./mixins";
-import { HTTPClient } from "./http";
 import { fetchDevices } from "~/api/storage/devices";
 
 const SERVICE_NAME = "org.opensuse.Agama.Storage1";
 const STORAGE_OBJECT = "/org/opensuse/Agama/Storage1";
-const STORAGE_JOBS_NAMESPACE = "/org/opensuse/Agama/Storage1/jobs";
-const STORAGE_JOB_IFACE = "org.opensuse.Agama.Storage1.Job";
 const ISCSI_NODES_NAMESPACE = "/storage/iscsi/nodes";
 const ZFCP_MANAGER_IFACE = "org.opensuse.Agama.Storage1.ZFCP.Manager";
 const ZFCP_CONTROLLERS_NAMESPACE = "/org/opensuse/Agama/Storage1/zfcp_controllers";
@@ -240,7 +238,7 @@ const dbusBasename = (path) => path.split("/").slice(-1)[0];
  */
 class ProposalManager {
   /**
-   * @param {HTTPClient} client
+   * @param {import("./http").HTTPClient} client
    */
   constructor(client) {
     this.client = client;

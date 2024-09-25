@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -26,8 +27,7 @@ import { Form } from "@patternfly/react-core";
 import { PasswordAndConfirmationInput, Popup } from "~/components/core";
 
 import { _ } from "~/i18n";
-import { useInstallerClient } from "~/context/installer";
-import { useRootUser, useRootUserMutation } from "~/queries/users";
+import { useRootUserMutation } from "~/queries/users";
 
 /**
  * A dialog holding the form to change the root password

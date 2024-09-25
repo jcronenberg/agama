@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -19,15 +20,13 @@
  * find current contact information at www.suse.com.
  */
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Navigate } from "react-router-dom";
-import { _ } from "~/i18n";
-import { useProduct } from "~/queries/software";
 import { Page, ProgressReport } from "~/components/core";
-import { IDLE } from "~/client/status";
-import { useInstallerClient } from "~/context/installer";
-import { PATHS } from "~/router";
+import { useProduct } from "~/queries/software";
 import { useInstallerStatus } from "~/queries/status";
+import { PATHS } from "~/router";
+import { _ } from "~/i18n";
 
 /**
  * @component

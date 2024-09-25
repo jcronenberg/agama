@@ -1,3 +1,23 @@
+// Copyright (c) [2024] SUSE LLC
+//
+// All Rights Reserved.
+//
+// This program is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the Free
+// Software Foundation; either version 2 of the License, or (at your option)
+// any later version.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+// more details.
+//
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, contact SUSE LLC.
+//
+// To contact SUSE LLC about this file by physical or electronic mail, you may
+// find current contact information at www.suse.com.
+
 //! Representation of the network configuration
 //!
 //! * This module contains the types that represent the network concepts. They are supposed to be
@@ -1149,7 +1169,7 @@ pub enum SecurityProtocol {
     WPA2,           // WPA2 + WPA3 personal ("wpa-psk")
     WPA3Personal,   // WPA3 personal only ("sae")
     WPA2Enterprise, // WPA2 + WPA3 Enterprise ("wpa-eap")
-    WPA3Only,       // WPA3 only ("wpa-eap-suite-b192")
+    WPA3Only,       // WPA3 only ("wpa-eap-suite-b-192")
 }
 
 impl fmt::Display for SecurityProtocol {
@@ -1161,7 +1181,7 @@ impl fmt::Display for SecurityProtocol {
             SecurityProtocol::WPA2 => "wpa-psk",
             SecurityProtocol::WPA3Personal => "sae",
             SecurityProtocol::WPA2Enterprise => "wpa-eap",
-            SecurityProtocol::WPA3Only => "wpa-eap-suite-b192",
+            SecurityProtocol::WPA3Only => "wpa-eap-suite-b-192",
         };
         write!(f, "{}", value)
     }
@@ -1178,7 +1198,7 @@ impl TryFrom<&str> for SecurityProtocol {
             "wpa-psk" => Ok(SecurityProtocol::WPA2),
             "sae" => Ok(SecurityProtocol::WPA3Personal),
             "wpa-eap" => Ok(SecurityProtocol::WPA2Enterprise),
-            "wpa-eap-suite-b192" => Ok(SecurityProtocol::WPA3Only),
+            "wpa-eap-suite-b-192" => Ok(SecurityProtocol::WPA3Only),
             _ => Err(NetworkStateError::InvalidSecurityProtocol(
                 value.to_string(),
             )),

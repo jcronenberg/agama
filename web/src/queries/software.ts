@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -43,6 +44,7 @@ import {
   fetchProposal,
   updateConfig,
 } from "~/api/software";
+import { QueryHookOptions } from "~/types/queries";
 
 /**
  * Query to retrieve software configuration
@@ -97,7 +99,7 @@ const useConfigMutation = () => {
 
   const query = {
     mutationFn: updateConfig,
-    onSuccess: (_: any, config: SoftwareConfig) => {
+    onSuccess: (_, config: SoftwareConfig) => {
       queryClient.invalidateQueries({ queryKey: ["software/config"] });
       queryClient.invalidateQueries({ queryKey: ["software/proposal"] });
       if (config.product) {

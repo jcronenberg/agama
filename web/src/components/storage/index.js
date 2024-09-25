@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -24,11 +25,6 @@ export { default as ProposalSettingsSection } from "./ProposalSettingsSection";
 export { default as ProposalTransactionalInfo } from "./ProposalTransactionalInfo";
 export { default as ProposalActionsDialog } from "./ProposalActionsDialog";
 export { default as ProposalResultSection } from "./ProposalResultSection";
-export { default as DASDPage } from "./DASDPage";
-export { default as DASDTable } from "./DASDTable";
-export { default as DASDFormatProgress } from "./DASDFormatProgress";
-export { default as ZFCPPage } from "./ZFCPPage";
-export { default as ZFCPDiskForm } from "./ZFCPDiskForm";
 export { default as ISCSIPage } from "./ISCSIPage";
 export { default as BootSelection } from "./BootSelection";
 export { default as DeviceSelectorTable } from "./DeviceSelectorTable";

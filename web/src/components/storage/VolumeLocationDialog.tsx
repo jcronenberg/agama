@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -19,8 +20,6 @@
  * find current contact information at www.suse.com.
  */
 
-// @ts-check
-
 import React, { useState } from "react";
 import { Form, FormGroup, Radio, Stack } from "@patternfly/react-core";
 import { FormReadOnlyField, Popup } from "~/components/core";
@@ -29,8 +28,6 @@ import { _ } from "~/i18n";
 import { sprintf } from "sprintf-js";
 import { deviceChildren, volumeLabel } from "~/components/storage/utils";
 import { StorageDevice, Volume, VolumeTarget } from "~/types/storage";
-
-type LocationOption = "auto" | "device" | "reuse";
 
 // TRANSLATORS: Description of the dialog for changing the location of a file system.
 const DIALOG_DESCRIPTION = _(

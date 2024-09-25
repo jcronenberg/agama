@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -61,17 +62,6 @@
  * @return {void}
  */
 
-const ISSUES_SOURCES = ["unknown", "system", "config"];
-
-const buildIssue = ({ description, details, source, severity }) => {
-  return {
-    description,
-    details,
-    source: ISSUES_SOURCES[source],
-    severity: severity === 0 ? "warn" : "error",
-  };
-};
-
 /**
  * Extends the given class with methods to get and track the service status
  *
@@ -123,12 +113,5 @@ const WithStatus = (superclass, status_path, service_name) =>
  * @param {ValidationError[]} errors - validation errors
  * @return {void}
  */
-
-/**
- * @param {string} message - Error message
- */
-const createError = (message) => {
-  return { message };
-};
 
 export { WithStatus };

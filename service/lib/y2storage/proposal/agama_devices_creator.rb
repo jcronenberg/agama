@@ -19,8 +19,10 @@
 # To contact SUSE LLC about this file by physical or electronic mail, you may
 # find current contact information at www.suse.com.
 
-require "y2storage/proposal/agama_lvm_helper"
 require "y2storage/exceptions"
+require "y2storage/proposal/agama_lvm_helper"
+require "y2storage/proposal/lvm_creator"
+require "y2storage/proposal/partition_creator"
 
 module Y2Storage
   module Proposal
@@ -82,7 +84,7 @@ module Y2Storage
       attr_reader :creator_result
 
       # @return [Devicegraph] Current devicegraph
-      attr_reader :devicegraph
+      attr_accessor :devicegraph
 
     private
 
@@ -110,6 +112,13 @@ module Y2Storage
       #   planned devices have been allocated
       def process_devices
         process_existing_partitionables
+        process_volume_groups
+
+        # This may be unexpected if the storage configuration provided by the user includes
+        # carefully crafted mount options but may be needed in weird situations for more automated
+        # proposals. Let's re-evaluate over time.
+        devicegraph.mount_points.each(&:adjust_mount_options)
+
         creator_result
       end
 
@@ -124,29 +133,45 @@ module Y2Storage
         # Check whether there is any chance of getting an unwanted order for the planned partitions
         # within a disk
         space_result = provide_space(partitions, original_graph, lvm_helper)
+        self.devicegraph = space_result[:devicegraph]
+        distribution = space_result[:partitions_distribution]
 
-        partition_creator = PartitionCreator.new(space_result[:devicegraph])
-        self.creator_result =
-          partition_creator.create_partitions(space_result[:partitions_distribution])
+        grow_and_reuse_devices(distribution)
+        self.creator_result = PartitionCreator.new(devicegraph).create_partitions(distribution)
+      end
 
-        # This may be here or before create_partitions.
-        #
-        # What about resizing if needed?
-        # Likely shrinking is fine and should be always handled at the SpaceMaker.
-        # But I'm not so sure if growing is so fine (we may need to make some space first).
-        # I don't think we have the growing case covered by SpaceMaker, the distribution
-        # calculator, etc.
-        #
-        planned_devices.each do |planned|
-          next unless planned.reuse?
+      # @see #process_devices
+      def process_volume_groups
+        # TODO: Reuse volume groups.
+        planned_devices.vgs.map { |v| create_volume_group(v) }
+      end
 
-          planned.reuse!(devicegraph)
-        end
+      # Creates a volume group for the the given planned device.
+      #
+      # @param planned [Planned::LvmVg]
+      def create_volume_group(planned)
+        pv_names = physical_volumes_for(planned.volume_group_name)
+        # TODO: Generate issue if there are no physical volumes.
+        return if pv_names.empty?
 
-        # This may be unexpected if the storage configuration provided by the user includes
-        # carefully crafted mount options but may be needed in weird situations for more automated
-        # proposals. Let's re-evaluate over time.
-        devicegraph.mount_points.each(&:adjust_mount_options)
+        creator = Proposal::LvmCreator.new(creator_result.devicegraph)
+        new_result = creator.create_volumes(planned, pv_names)
+        self.creator_result = creator_result.merge(new_result)
+      end
+
+      # Physical volumes (new partitions and reused devices) for a new volume group.
+      #
+      # @param vg_name [String]
+      # @return [Array<String>]
+      def physical_volumes_for(vg_name)
+        pv_condition = proc { |d| d.respond_to?(:pv_for?) && d.pv_for?(vg_name) }
+
+        new_pvs = creator_result.created_names(&pv_condition)
+        reused_pvs = reused_planned_devices
+          .select(&pv_condition)
+          .map(&:reuse_name)
+
+        new_pvs + reused_pvs
       end
 
       # @see #process_existing_partitionables
@@ -157,10 +182,41 @@ module Y2Storage
       end
 
       # @see #process_existing_partitionables
+      def grow_and_reuse_devices(distribution)
+        planned_devices.select(&:reuse?).each do |planned|
+          space = assigned_space_next_to(planned, distribution)
+
+          planned.limit_grow(space.disposable_size, devicegraph) if space
+          planned.reuse!(devicegraph)
+          # TODO: Check if the final size is smaller than the min and... abort? register issue?
+          space&.update_disk_space
+        end
+      end
+
+      # Assigned space that is located next to the given planned device, only if that device
+      # points to an existing partition that needs to grow
+      #
+      # @return [Y2Storage::Planned::AssignedSpace]
+      def assigned_space_next_to(planned, distribution)
+        return unless planned.respond_to?(:subsequent_slot?)
+        return unless planned.resize?
+
+        distribution.spaces.find { |s| planned.subsequent_slot?(s) }
+      end
+
+      # @see #process_existing_partitionables
       def partitions_for_existing(planned_devices)
         # Maybe in the future this can include partitions on top of existing MDs
         # NOTE: simplistic implementation
         planned_devices.partitions.reject(&:reuse?)
+      end
+
+      # Planned devices configured to be reused.
+      #
+      # @return [Array<Planned::Device>]
+      def reused_planned_devices
+        planned_devices.disks.select(&:reuse?) +
+          planned_devices.disks.flat_map(&:partitions).select(&:reuse?)
       end
 
       # Formats and/or mounts the disk-like block devices

@@ -20,14 +20,16 @@
 # find current contact information at www.suse.com.
 
 require "agama/storage/configs/size"
+require "agama/storage/configs/with_search"
+require "agama/storage/configs/with_alias"
 
 module Agama
   module Storage
     module Configs
       # Section of the configuration representing a partition
       class Partition
-        # @return [Search, nil]
-        attr_accessor :search
+        include WithAlias
+        include WithSearch
 
         # @return [Boolean]
         attr_accessor :delete
@@ -53,15 +55,6 @@ module Agama
           @size = Size.new
           @delete = false
           @delete_if_needed = false
-        end
-
-        # Assigned device according to the search.
-        #
-        # @see Y2Storage::Proposal::AgamaSearcher
-        #
-        # @return [Y2Storage::Device, nil]
-        def found_device
-          search&.device
         end
       end
     end

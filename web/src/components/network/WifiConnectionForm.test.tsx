@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -18,13 +19,13 @@
  * To contact SUSE LLC about this file by physical or electronic mail, you may
  * find current contact information at www.suse.com.
  */
+
 import React from "react";
 import { screen, waitFor } from "@testing-library/react";
 import { plainRender } from "~/test-utils";
 import WifiConnectionForm from "~/components/network/WifiConnectionForm";
 import {
   Connection,
-  ConnectionStatus,
   SecurityProtocols,
   WifiNetwork,
   WifiNetworkStatus,
@@ -73,7 +74,7 @@ const renderForm = (network: WifiNetwork, errors = {}) =>
 describe("WifiConnectionForm", () => {
   it("renders a generic warning when mounted with no needsAuth erorr", () => {
     renderForm(networkMock, { errorsId: true });
-    const connectButton = screen.getByText("Connect");
+    screen.getByText("Connect");
     screen.getByText("Warning alert:");
   });
 

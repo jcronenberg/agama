@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -66,7 +67,7 @@ export default function DeviceSelection() {
       targetDevice: availableDevices.find((d) => d.name === settings.targetDevice),
       targetPVDevices: availableDevices.filter((d) => settings.targetPVDevices?.includes(d.name)),
     });
-  }, [settings, availableDevices]);
+  }, [settings, availableDevices, state.target]);
 
   const selectTargetDisk = () => setState({ ...state, target: ProposalTarget.DISK });
   const selectTargetNewLvmVG = () => setState({ ...state, target: ProposalTarget.NEW_LVM_VG });
