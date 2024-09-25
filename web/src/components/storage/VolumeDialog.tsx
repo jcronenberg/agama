@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -456,7 +457,7 @@ const createInitialState = (volume: Volume): VolumeFormState => {
 /**
  * The VolumeForm reducer.
  */
-const reducer = (state: VolumeFormState, action: { type: string; payload: any }) => {
+const reducer = (state: VolumeFormState, action: { type: string; payload }) => {
   const { type, payload } = action;
 
   switch (type) {
@@ -506,7 +507,7 @@ export default function VolumeDialog({
   onCancel,
   onAccept,
 }: VolumeDialogProps) {
-  const [state, dispatch]: [VolumeFormState, (action: any) => void] = useReducer(
+  const [state, dispatch]: [VolumeFormState, (action) => void] = useReducer(
     reducer,
     currentVolume,
     createInitialState,

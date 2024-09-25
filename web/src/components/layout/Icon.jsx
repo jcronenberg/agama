@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -38,7 +39,6 @@ import Edit from "@icons/edit.svg?component";
 import EditSquare from "@icons/edit_square.svg?component";
 import Error from "@icons/error.svg?component";
 import ExpandAll from "@icons/expand_all.svg?component";
-import ExpandMore from "@icons/expand_more.svg?component";
 import Feedback from "@icons/feedback.svg?component";
 import Folder from "@icons/folder.svg?component";
 import FolderOff from "@icons/folder_off.svg?component";
@@ -84,7 +84,7 @@ import WifiOff from "@icons/wifi_off.svg?component";
 
 // Icons from react-simple-icons
 
-import { SiLinux, SiWindows } from "@icons-pack/react-simple-icons";
+import { SiLinux } from "@icons-pack/react-simple-icons";
 
 /**
  * @typedef {string|number} IconSize
@@ -107,7 +107,6 @@ const icons = {
   edit_square: EditSquare,
   error: Error,
   expand_all: ExpandAll,
-  expand_more: ExpandMore,
   feedback: Feedback,
   folder: Folder,
   folder_off: FolderOff,
@@ -152,7 +151,6 @@ const icons = {
   wifi_off: WifiOff,
   // brand icons
   linux_logo: SiLinux,
-  windows_logo: SiWindows,
 };
 
 const PREDEFINED_SIZES = ["xxxs", "xxs", "xs", "s", "m", "l", "xl", "xxl", "xxxl"];

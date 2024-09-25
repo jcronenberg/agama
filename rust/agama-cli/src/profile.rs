@@ -1,6 +1,25 @@
+// Copyright (c) [2024] SUSE LLC
+//
+// All Rights Reserved.
+//
+// This program is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the Free
+// Software Foundation; either version 2 of the License, or (at your option)
+// any later version.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+// more details.
+//
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, contact SUSE LLC.
+//
+// To contact SUSE LLC about this file by physical or electronic mail, you may
+// find current contact information at www.suse.com.
+
 use agama_lib::{
     auth::AuthToken,
-    connection,
     install_settings::InstallSettings,
     profile::{AutoyastProfile, ProfileEvaluator, ProfileValidator, ValidationResult},
     Store as SettingsStore,
@@ -92,10 +111,10 @@ fn validate(path: &PathBuf) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn evaluate(path: &PathBuf) -> anyhow::Result<()> {
+fn evaluate(path: &Path) -> anyhow::Result<()> {
     let evaluator = ProfileEvaluator {};
     evaluator
-        .evaluate(&path, stdout())
+        .evaluate(path, stdout())
         .context("Could not evaluate the profile".to_string())?;
     Ok(())
 }
@@ -149,7 +168,7 @@ async fn import(url_string: String, dir: Option<PathBuf>) -> anyhow::Result<()> 
 async fn store_settings<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
     let token = AuthToken::find().context("You are not logged in")?;
     let client = agama_lib::http_client(token.as_str())?;
-    let store = SettingsStore::new(connection().await?, client).await?;
+    let store = SettingsStore::new(client).await?;
     let settings = InstallSettings::from_file(&path)?;
     store.store(&settings).await?;
     Ok(())

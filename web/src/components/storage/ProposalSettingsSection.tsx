@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -25,10 +26,8 @@ import EncryptionField, { EncryptionConfig } from "~/components/storage/Encrypti
 import InstallationDeviceField from "~/components/storage/InstallationDeviceField";
 import PartitionsField from "~/components/storage/PartitionsField";
 import { TargetConfig } from "~/components/storage/InstallationDeviceField";
-import { BootConfig } from "~/components/storage/BootConfigField";
 import { CHANGING, NOT_AFFECTED } from "~/components/storage/ProposalPage";
 import { ProposalSettings, StorageDevice, Volume } from "~/types/storage";
-import { _ } from "~/i18n";
 import { compact } from "~/utils";
 
 /**

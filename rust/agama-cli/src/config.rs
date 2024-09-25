@@ -1,3 +1,23 @@
+// Copyright (c) [2024] SUSE LLC
+//
+// All Rights Reserved.
+//
+// This program is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the Free
+// Software Foundation; either version 2 of the License, or (at your option)
+// any later version.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+// more details.
+//
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, contact SUSE LLC.
+//
+// To contact SUSE LLC about this file by physical or electronic mail, you may
+// find current contact information at www.suse.com.
+
 use std::{
     io::{self, Read},
     path::PathBuf,
@@ -5,9 +25,7 @@ use std::{
 };
 
 use crate::show_progress;
-use agama_lib::{
-    auth::AuthToken, connection, install_settings::InstallSettings, Store as SettingsStore,
-};
+use agama_lib::{auth::AuthToken, install_settings::InstallSettings, Store as SettingsStore};
 use anyhow::anyhow;
 use clap::Subcommand;
 use std::io::Write;
@@ -48,7 +66,7 @@ pub async fn run(subcommand: ConfigCommands) -> anyhow::Result<()> {
     };
 
     let client = agama_lib::http_client(token.as_str())?;
-    let store = SettingsStore::new(connection().await?, client).await?;
+    let store = SettingsStore::new(client).await?;
 
     match subcommand {
         ConfigCommands::Show => {
@@ -91,7 +109,7 @@ fn edit(model: &InstallSettings, editor: &str) -> anyhow::Result<InstallSettings
     let path = PathBuf::from(file.path());
     write!(file, "{}", content)?;
 
-    let mut command = editor_command(&editor);
+    let mut command = editor_command(editor);
     let status = command.arg(path.as_os_str()).status()?;
     if status.success() {
         return Ok(InstallSettings::from_file(path)?);

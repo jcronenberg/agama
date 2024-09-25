@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -24,14 +25,14 @@
 import { L10nClient } from "./l10n";
 import { ManagerClient } from "./manager";
 import { StorageClient } from "./storage";
-import { HTTPClient, WSClient } from "./http";
+import { HTTPClient } from "./http";
 
 /**
  * @typedef {object} InstallerClient
  * @property {L10nClient} l10n - localization client.
  * @property {ManagerClient} manager - manager client.
  * @property {StorageClient} storage - storage client.
- * @property {() => WSClient} ws - Agama WebSocket client.
+ * @property {() => import("./http").WSClient} ws - Agama WebSocket client.
  * @property {() => boolean} isConnected - determines whether the client is connected
  * @property {() => boolean} isRecoverable - determines whether the client is recoverable after disconnected
  * @property {(handler: () => void) => (() => void)} onConnect - registers a handler to run

@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -19,7 +20,7 @@
  * find current contact information at www.suse.com.
  */
 
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { Grid, GridItem, Stack } from "@patternfly/react-core";
 import { Page, Drawer } from "~/components/core/";
 import ProposalTransactionalInfo from "./ProposalTransactionalInfo";
@@ -88,7 +89,7 @@ export default function ProposalPage() {
         queryClient.invalidateQueries({ queryKey: ["storage"] });
       });
     }
-  }, [deprecated]);
+  }, [deprecated, queryClient]);
 
   const errors = useIssues("storage")
     .filter((s) => s.severity === IssueSeverity.Error)

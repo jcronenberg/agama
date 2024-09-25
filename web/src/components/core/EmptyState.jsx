@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -22,7 +23,14 @@
 // @ts-check
 
 import React from "react";
-import { EmptyState, EmptyStateHeader, EmptyStateBody, Stack } from "@patternfly/react-core";
+import {
+  EmptyState,
+  EmptyStateHeader,
+  EmptyStateBody,
+  Stack,
+  EmptyStateFooter,
+  EmptyStateActions,
+} from "@patternfly/react-core";
 import { Icon } from "~/components/layout";
 
 /**
@@ -44,6 +52,7 @@ import { Icon } from "~/components/layout";
  * @param {string} [props.color="color-100"]
  * @param {EmptyStateHeaderProps["headingLevel"]} [props.headingLevel="h4"]
  * @param {boolean} [props.noPadding=false]
+ * @param {React.ReactNode} [props.actions]
  * @param {React.ReactNode} [props.children]
  * @param {EmptyStateProps} [props.rest]
  * @todo write documentation
@@ -51,9 +60,10 @@ import { Icon } from "~/components/layout";
 export default function EmptyStateWrapper({
   title,
   icon,
-  color,
+  color = "color-100",
   headingLevel = "h4",
   noPadding = false,
+  actions,
   children,
   ...rest
 }) {
@@ -73,6 +83,11 @@ export default function EmptyStateWrapper({
         <EmptyStateBody>
           <Stack hasGutter>{children}</Stack>
         </EmptyStateBody>
+      )}
+      {actions && (
+        <EmptyStateFooter>
+          <EmptyStateActions>{actions}</EmptyStateActions>
+        </EmptyStateFooter>
       )}
     </EmptyState>
   );

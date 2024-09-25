@@ -1,3 +1,23 @@
+// Copyright (c) [2024] SUSE LLC
+//
+// All Rights Reserved.
+//
+// This program is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the Free
+// Software Foundation; either version 2 of the License, or (at your option)
+// any later version.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+// more details.
+//
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, contact SUSE LLC.
+//
+// To contact SUSE LLC about this file by physical or electronic mail, you may
+// find current contact information at www.suse.com.
+
 use utoipa::OpenApi;
 #[derive(OpenApi)]
 #[openapi(
@@ -49,6 +69,21 @@ use utoipa::OpenApi;
         crate::storage::web::iscsi::nodes,
         crate::storage::web::iscsi::update_initiator,
         crate::storage::web::iscsi::update_node,
+        crate::storage::web::dasd::probe,
+        crate::storage::web::dasd::supported,
+        crate::storage::web::dasd::devices,
+        crate::storage::web::dasd::format,
+        crate::storage::web::dasd::enable,
+        crate::storage::web::dasd::disable,
+        crate::storage::web::dasd::set_diag,
+        crate::storage::web::zfcp::supported,
+        crate::storage::web::zfcp::controllers,
+        crate::storage::web::zfcp::activate_controller,
+        crate::storage::web::zfcp::activate_disk,
+        crate::storage::web::zfcp::deactivate_disk,
+        crate::storage::web::zfcp::get_disks,
+        crate::storage::web::zfcp::get_wwpns,
+        crate::storage::web::zfcp::get_luns,
         crate::users::web::get_root_config,
         crate::users::web::get_user_config,
         crate::users::web::patch_root,
@@ -88,6 +123,10 @@ use utoipa::OpenApi;
         schemas(agama_lib::storage::model::Volume),
         schemas(agama_lib::storage::model::VolumeOutline),
         schemas(agama_lib::storage::model::VolumeTarget),
+        schemas(agama_lib::storage::model::dasd::DASDDevice),
+        schemas(agama_lib::storage::model::dasd::DASDFormatSummary),
+        schemas(agama_lib::storage::model::zfcp::ZFCPDisk),
+        schemas(agama_lib::storage::model::zfcp::ZFCPController),
         schemas(agama_lib::storage::client::iscsi::ISCSIAuth),
         schemas(agama_lib::storage::client::iscsi::ISCSIInitiator),
         schemas(agama_lib::storage::client::iscsi::ISCSINode),

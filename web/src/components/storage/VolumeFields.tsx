@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -65,8 +66,7 @@ const MountPathField = ({
 }: MountPathFieldProps) => {
   const label = _("Mount point");
 
-  const changeMountPath: (_: any, mountPath: string) => void = (_, mountPath) =>
-    onChange(mountPath);
+  const changeMountPath: (_, mountPath: string) => void = (_, mountPath) => onChange(mountPath);
 
   if (isReadOnly) {
     return <FormReadOnlyField label={label}>{value}</FormReadOnlyField>;
@@ -332,8 +332,8 @@ const SizeManual = ({
   isDisabled,
   onChange,
 }: {
-  errors: any;
-  formData: any;
+  errors;
+  formData;
   isDisabled: boolean;
   onChange: (v: object) => void;
 }) => {
@@ -395,8 +395,8 @@ const SizeRange = ({
   isDisabled,
   onChange,
 }: {
-  errors: any;
-  formData: any;
+  errors;
+  formData;
   isDisabled: boolean;
   onChange: (v: object) => void;
 }) => {
@@ -500,7 +500,7 @@ const SIZE_OPTION_LABELS = Object.freeze({
 
 type SizeOptionsFieldProps = {
   volume: Volume;
-  formData: any;
+  formData;
   errors?: object;
   isDisabled?: boolean;
   onChange: (v: object) => void;

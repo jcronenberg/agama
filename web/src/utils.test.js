@@ -4,8 +4,9 @@
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -81,9 +82,11 @@ describe("uniq", () => {
 
 describe("classNames", () => {
   it("join given arguments, ignoring falsy values", () => {
-    expect(classNames("bg-yellow", false && "h-24", undefined, null, true && "w-24")).toEqual(
-      "bg-yellow w-24",
-    );
+    const includeClass = true;
+
+    expect(
+      classNames("bg-yellow", !includeClass && "h-24", undefined, null, includeClass && "w-24"),
+    ).toEqual("bg-yellow w-24");
   });
 });
 
