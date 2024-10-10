@@ -4,6 +4,7 @@ use crate::MIGRATION_SETTINGS;
 
 use regex::Regex;
 use std::fs::{self, read_dir};
+use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 
 pub struct InterfacesResult {
@@ -23,6 +24,10 @@ pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
             ))
         }
     };
+    deserialize_xml(contents)
+}
+
+pub fn deserialize_xml(contents: String) -> Result<InterfacesResult, anyhow::Error> {
     let replaced_string = replace_colons(contents.as_str());
     let deserializer = &mut quick_xml::de::Deserializer::from_str(replaced_string.as_str());
     let mut unhandled_fields = vec![];
@@ -89,10 +94,19 @@ fn recurse_files(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
 
 pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
     let settings = MIGRATION_SETTINGS.get().unwrap();
-    let mut result = InterfacesResult {
-        interfaces: vec![],
-        netconfig: None,
-        warning: None,
+
+    let mut result = if paths.len() == 1 && paths[0] == "-" {
+        let mut buffer = String::new();
+
+        let stdin = io::stdin();
+        let lines = stdin.lock().lines();
+        for line in lines {
+            buffer.push_str(&line.unwrap());
+        }
+
+        deserialize_xml(buffer)?
+    } else {
+        read_files(paths)?
     };
 
     if settings.with_netconfig {
@@ -107,7 +121,20 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
         };
     }
 
-    for path in paths {
+    // Filter loopback as it doesn't need to be migrated
+    result.interfaces.retain(|interface| interface.name != "lo");
+
+    Ok(result)
+}
+
+fn read_files(file_paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
+    let mut result = InterfacesResult {
+        interfaces: vec![],
+        netconfig: None,
+        warning: None,
+    };
+
+    for path in file_paths {
         let path: PathBuf = path.into();
         if path.is_dir() {
             let files = recurse_files(path)?;
@@ -134,10 +161,6 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
             result.interfaces.append(&mut read_xml.interfaces);
         }
     }
-
-    // Filter loopback as it doesn't need to be migrated
-    result.interfaces.retain(|interface| interface.name != "lo");
-
     Ok(result)
 }
 
@@ -145,7 +168,6 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
 mod tests {
     use super::*;
     use crate::bond::*;
-    use crate::interface::*;
 
     #[test]
     fn test_bond_options_from_xml() {
@@ -192,8 +214,9 @@ mod tests {
                 </bond>
             </interface>
             "##;
-        let ifc = quick_xml::de::from_str::<Vec<Interface>>(replace_colons(xml).as_str())
+        let ifc = deserialize_xml(xml.to_string())
             .unwrap()
+            .interfaces
             .pop()
             .unwrap();
         assert!(ifc.bond.is_some());
@@ -255,8 +278,9 @@ mod tests {
               </bridge>
             </interface>
             "##;
-        let ifc = quick_xml::de::from_str::<Vec<Interface>>(replace_colons(xml).as_str())
+        let ifc = deserialize_xml(xml.to_string())
             .unwrap()
+            .interfaces
             .pop()
             .unwrap();
         assert!(ifc.bridge.is_some());
@@ -273,7 +297,7 @@ mod tests {
                 </ipv4:static>
             </interface>
             "##;
-        let err = quick_xml::de::from_str::<Vec<Interface>>(replace_colons(xml).as_str());
+        let err = deserialize_xml(xml.to_string());
         assert!(err.is_err());
     }
 
@@ -288,8 +312,9 @@ mod tests {
             </interface>
             "##;
 
-        let ifc = quick_xml::de::from_str::<Vec<Interface>>(replace_colons(xml).as_str())
+        let ifc = deserialize_xml(xml.to_string())
             .unwrap()
+            .interfaces
             .pop()
             .unwrap();
         assert_eq!(ifc.firewall.zone, Some("foo".to_string()));
