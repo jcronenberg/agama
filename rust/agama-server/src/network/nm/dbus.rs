@@ -22,8 +22,14 @@
 //!
 //! Working with hash maps coming from D-Bus is rather tedious and it is even worse when working
 //! with nested hash maps (see [NestedHash] and [OwnedNestedHash]).
+
+#[cfg(feature = "network-model-additional-values")]
+mod additional_model_dbus;
+
 use super::{error::NmError, model::*};
 use crate::network::model::*;
+#[cfg(feature = "network-model-additional-values")]
+use crate::network::nm::dbus::additional_model_dbus::*;
 use agama_lib::{
     dbus::{get_optional_property, get_property, to_owned_hash, NestedHash, OwnedNestedHash},
     network::types::{BondMode, SSID},
@@ -40,11 +46,6 @@ const WIRELESS_KEY: &str = "802-11-wireless";
 const WIRELESS_SECURITY_KEY: &str = "802-11-wireless-security";
 const LOOPBACK_KEY: &str = "loopback";
 const DUMMY_KEY: &str = "dummy";
-const VLAN_KEY: &str = "vlan";
-const BRIDGE_KEY: &str = "bridge";
-const BRIDGE_PORT_KEY: &str = "bridge-port";
-const INFINIBAND_KEY: &str = "infiniband";
-const TUN_KEY: &str = "tun";
 const IEEE_8021X_KEY: &str = "802-1x";
 
 /// Converts a connection struct into a HashMap that can be sent over D-Bus.
@@ -68,6 +69,7 @@ pub fn connection_to_dbus<'a>(
     if let Some(controller) = controller {
         let slave_type = match controller.config {
             ConnectionConfig::Bond(_) => BOND_KEY,
+            #[cfg(feature = "network-model-additional-values")]
             ConnectionConfig::Bridge(_) => BRIDGE_KEY,
             _ => {
                 log::error!("Controller {} has unhandled config type", controller.id);
@@ -130,28 +132,33 @@ pub fn connection_to_dbus<'a>(
         ConnectionConfig::Dummy => {
             connection_dbus.insert("type", DUMMY_KEY.into());
         }
+        ConnectionConfig::Loopback => {
+            connection_dbus.insert("type", LOOPBACK_KEY.into());
+        }
+        #[cfg(feature = "network-model-additional-values")]
         ConnectionConfig::Vlan(vlan) => {
             connection_dbus.insert("type", VLAN_KEY.into());
             result.extend(vlan_config_to_dbus(vlan));
         }
+        #[cfg(feature = "network-model-additional-values")]
         ConnectionConfig::Bridge(bridge) => {
             connection_dbus.insert("type", BRIDGE_KEY.into());
             result.insert(BRIDGE_KEY, bridge_config_to_dbus(bridge));
         }
-        ConnectionConfig::Infiniband(infiniband) => {
-            connection_dbus.insert("type", INFINIBAND_KEY.into());
-            result.insert(INFINIBAND_KEY, infiniband_config_to_dbus(infiniband));
-        }
-        ConnectionConfig::Loopback => {
-            connection_dbus.insert("type", LOOPBACK_KEY.into());
-        }
+        #[cfg(feature = "network-model-additional-values")]
         ConnectionConfig::Tun(tun) => {
             connection_dbus.insert("type", TUN_KEY.into());
             result.insert(TUN_KEY, tun_config_to_dbus(tun));
         }
+        #[cfg(feature = "network-model-additional-values")]
+        ConnectionConfig::Infiniband(infiniband) => {
+            connection_dbus.insert("type", INFINIBAND_KEY.into());
+            result.insert(INFINIBAND_KEY, infiniband_config_to_dbus(infiniband));
+        }
         _ => {}
     }
 
+    #[cfg(feature = "network-model-additional-values")]
     match &conn.port_config {
         PortConfig::Bridge(bridge_port) => {
             result.insert(BRIDGE_PORT_KEY, bridge_port_config_to_dbus(bridge_port));
@@ -173,10 +180,6 @@ pub fn connection_to_dbus<'a>(
 pub fn connection_from_dbus(conn: OwnedNestedHash) -> Result<Connection, NmError> {
     let mut connection = base_connection_from_dbus(&conn)?;
 
-    if let Some(bridge_port_config) = bridge_port_config_from_dbus(&conn)? {
-        connection.port_config = PortConfig::Bridge(bridge_port_config);
-    }
-
     if let Some(ieee_8021x_config) = ieee_8021x_config_from_dbus(&conn)? {
         connection.ieee_8021x_config = Some(ieee_8021x_config);
     }
@@ -191,24 +194,33 @@ pub fn connection_from_dbus(conn: OwnedNestedHash) -> Result<Connection, NmError
         return Ok(connection);
     }
 
+    #[cfg(feature = "network-model-additional-values")]
     if let Some(vlan_config) = vlan_config_from_dbus(&conn)? {
         connection.config = ConnectionConfig::Vlan(vlan_config);
         return Ok(connection);
     }
 
+    #[cfg(feature = "network-model-additional-values")]
     if let Some(bridge_config) = bridge_config_from_dbus(&conn)? {
         connection.config = ConnectionConfig::Bridge(bridge_config);
         return Ok(connection);
     }
 
+    #[cfg(feature = "network-model-additional-values")]
     if let Some(infiniband_config) = infiniband_config_from_dbus(&conn)? {
         connection.config = ConnectionConfig::Infiniband(infiniband_config);
         return Ok(connection);
     }
 
+    #[cfg(feature = "network-model-additional-values")]
     if let Some(tun_config) = tun_config_from_dbus(&conn)? {
         connection.config = ConnectionConfig::Tun(tun_config);
         return Ok(connection);
+    }
+
+    #[cfg(feature = "network-model-additional-values")]
+    if let Some(bridge_port_config) = bridge_port_config_from_dbus(&conn)? {
+        connection.port_config = PortConfig::Bridge(bridge_port_config);
     }
 
     if conn.contains_key(DUMMY_KEY) {
@@ -481,138 +493,6 @@ fn bond_config_to_dbus(config: &BondConfig) -> HashMap<&str, zvariant::Value> {
     let mut options = config.options.0.clone();
     options.insert("mode".to_string(), config.mode.to_string());
     HashMap::from([("options", Value::new(options))])
-}
-
-fn bridge_config_to_dbus(bridge: &BridgeConfig) -> HashMap<&str, zvariant::Value> {
-    let mut hash = HashMap::new();
-
-    hash.insert("stp", bridge.stp.into());
-    if let Some(prio) = bridge.priority {
-        hash.insert("priority", prio.into());
-    }
-    if let Some(fwd_delay) = bridge.forward_delay {
-        hash.insert("forward-delay", fwd_delay.into());
-    }
-    if let Some(hello_time) = bridge.hello_time {
-        hash.insert("hello-time", hello_time.into());
-    }
-    if let Some(max_age) = bridge.max_age {
-        hash.insert("max-age", max_age.into());
-    }
-    if let Some(ageing_time) = bridge.ageing_time {
-        hash.insert("ageing-time", ageing_time.into());
-    }
-
-    hash
-}
-
-fn bridge_config_from_dbus(conn: &OwnedNestedHash) -> Result<Option<BridgeConfig>, NmError> {
-    let Some(bridge) = conn.get(BRIDGE_KEY) else {
-        return Ok(None);
-    };
-
-    Ok(Some(BridgeConfig {
-        stp: get_property(bridge, "stp")?,
-        priority: get_optional_property(bridge, "priority")?,
-        forward_delay: get_optional_property(bridge, "forward-delay")?,
-        hello_time: get_optional_property(bridge, "hello-time")?,
-        max_age: get_optional_property(bridge, "max-age")?,
-        ageing_time: get_optional_property(bridge, "ageing-time")?,
-    }))
-}
-
-fn bridge_port_config_to_dbus(bridge_port: &BridgePortConfig) -> HashMap<&str, zvariant::Value> {
-    let mut hash = HashMap::new();
-
-    if let Some(prio) = bridge_port.priority {
-        hash.insert("priority", prio.into());
-    }
-    if let Some(pc) = bridge_port.path_cost {
-        hash.insert("path-cost", pc.into());
-    }
-
-    hash
-}
-
-fn bridge_port_config_from_dbus(
-    conn: &OwnedNestedHash,
-) -> Result<Option<BridgePortConfig>, NmError> {
-    let Some(bridge_port) = conn.get(BRIDGE_PORT_KEY) else {
-        return Ok(None);
-    };
-
-    Ok(Some(BridgePortConfig {
-        priority: get_optional_property(bridge_port, "priority")?,
-        path_cost: get_optional_property(bridge_port, "path_cost")?,
-    }))
-}
-
-fn infiniband_config_to_dbus(config: &InfinibandConfig) -> HashMap<&str, zvariant::Value> {
-    let mut infiniband_config: HashMap<&str, zvariant::Value> = HashMap::from([
-        (
-            "transport-mode",
-            Value::new(config.transport_mode.to_string()),
-        ),
-        ("p-key", Value::new(config.p_key.unwrap_or(-1))),
-    ]);
-
-    if let Some(parent) = &config.parent {
-        infiniband_config.insert("parent", parent.into());
-    }
-
-    infiniband_config
-}
-
-fn infiniband_config_from_dbus(
-    conn: &OwnedNestedHash,
-) -> Result<Option<InfinibandConfig>, NmError> {
-    let Some(infiniband) = conn.get(INFINIBAND_KEY) else {
-        return Ok(None);
-    };
-
-    let mut config = InfinibandConfig {
-        p_key: get_optional_property(infiniband, "p-key")?,
-        parent: get_optional_property(infiniband, "parent")?,
-        ..Default::default()
-    };
-
-    if let Some(transport_mode) = get_optional_property::<String>(infiniband, "transport-mode")? {
-        config.transport_mode = InfinibandTransportMode::from_str(transport_mode.as_str())?;
-    }
-
-    Ok(Some(config))
-}
-
-fn tun_config_to_dbus(config: &TunConfig) -> HashMap<&str, zvariant::Value> {
-    let mut tun_config: HashMap<&str, zvariant::Value> =
-        HashMap::from([("mode", Value::new(config.mode.clone() as u32))]);
-
-    if let Some(group) = &config.group {
-        tun_config.insert("group", group.into());
-    }
-
-    if let Some(owner) = &config.owner {
-        tun_config.insert("owner", owner.into());
-    }
-
-    tun_config
-}
-
-fn tun_config_from_dbus(conn: &OwnedNestedHash) -> Result<Option<TunConfig>, NmError> {
-    let Some(tun) = conn.get(TUN_KEY) else {
-        return Ok(None);
-    };
-
-    let mode = match get_property::<u32>(tun, "mode") {
-        Ok(2) => TunMode::Tap,
-        _ => TunMode::Tun,
-    };
-
-    Ok(Some(TunConfig {
-        mode,
-        group: get_optional_property(tun, "group")?,
-        owner: get_optional_property(tun, "owner")?,
-    }))
 }
 
 /// Converts a MatchConfig struct into a HashMap that can be sent over D-Bus.
@@ -994,33 +874,6 @@ fn bond_config_from_dbus(conn: &OwnedNestedHash) -> Result<Option<BondConfig>, N
     Ok(Some(bond))
 }
 
-fn vlan_config_to_dbus(cfg: &VlanConfig) -> NestedHash {
-    let vlan: HashMap<&str, zvariant::Value> = HashMap::from([
-        ("id", cfg.id.into()),
-        ("parent", cfg.parent.clone().into()),
-        ("protocol", cfg.protocol.to_string().into()),
-    ]);
-
-    NestedHash::from([("vlan", vlan)])
-}
-
-fn vlan_config_from_dbus(conn: &OwnedNestedHash) -> Result<Option<VlanConfig>, NmError> {
-    let Some(vlan) = conn.get(VLAN_KEY) else {
-        return Ok(None);
-    };
-
-    let protocol = match get_property::<String>(vlan, "protocol") {
-        Ok(protocol) => VlanProtocol::from_str(protocol.as_str()).unwrap_or_default(),
-        _ => Default::default(),
-    };
-
-    Ok(Some(VlanConfig {
-        id: get_property(vlan, "id")?,
-        parent: get_property(vlan, "parent")?,
-        protocol,
-    }))
-}
-
 fn ieee_8021x_config_to_dbus(config: &IEEE8021XConfig) -> HashMap<&str, zvariant::Value> {
     let mut ieee_8021x_config: HashMap<&str, zvariant::Value> = HashMap::from([(
         "eap",
@@ -1196,7 +1049,7 @@ mod test {
     use crate::network::{
         model::*,
         nm::{
-            dbus::{BOND_KEY, ETHERNET_KEY, INFINIBAND_KEY, WIRELESS_KEY, WIRELESS_SECURITY_KEY},
+            dbus::{BOND_KEY, ETHERNET_KEY, WIRELESS_KEY, WIRELESS_SECURITY_KEY},
             error::NmError,
         },
     };
@@ -1207,7 +1060,7 @@ mod test {
     use zbus::zvariant::{self, Array, Dict, OwnedValue, Value};
 
     // hash item
-    fn hi<'a, T>(key: &str, value: T) -> anyhow::Result<(String, OwnedValue)>
+    pub fn hi<'a, T>(key: &str, value: T) -> anyhow::Result<(String, OwnedValue)>
     where
         T: Into<Value<'a>> + zbus::zvariant::Type,
     {
@@ -1427,33 +1280,6 @@ mod test {
     }
 
     #[test]
-    fn test_connection_from_dbus_infiniband() -> anyhow::Result<()> {
-        let uuid = Uuid::new_v4().to_string();
-        let connection_section = HashMap::from([hi("id", "ib0")?, hi("uuid", uuid)?]);
-
-        let infiniband_section = HashMap::from([
-            hi("p-key", 0x8001_i32)?,
-            hi("parent", "ib0")?,
-            hi("transport-mode", "datagram")?,
-        ]);
-
-        let dbus_conn = HashMap::from([
-            ("connection".to_string(), connection_section),
-            (INFINIBAND_KEY.to_string(), infiniband_section),
-        ]);
-
-        let connection = connection_from_dbus(dbus_conn).unwrap();
-        let ConnectionConfig::Infiniband(infiniband) = &connection.config else {
-            panic!("Wrong connection type")
-        };
-        assert_eq!(infiniband.p_key, Some(0x8001));
-        assert_eq!(infiniband.parent, Some("ib0".to_string()));
-        assert_eq!(infiniband.transport_mode, InfinibandTransportMode::Datagram);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_connection_from_dbus_ieee_8021x() -> anyhow::Result<()> {
         let connection_section = HashMap::from([
             hi("id", "eap0")?,
@@ -1514,35 +1340,6 @@ mod test {
         assert_eq!(config.anonymous_identity, Some("anon_identity".to_string()));
         assert_eq!(config.peap_version, Some("1".to_string()));
         assert!(!config.peap_label);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_dbus_from_infiniband_connection() -> anyhow::Result<()> {
-        let config = InfinibandConfig {
-            p_key: Some(0x8002),
-            parent: Some("ib1".to_string()),
-            transport_mode: InfinibandTransportMode::Connected,
-        };
-        let mut infiniband = build_base_connection();
-        infiniband.config = ConnectionConfig::Infiniband(config);
-        let infiniband_dbus = connection_to_dbus(&infiniband, None);
-
-        let infiniband = infiniband_dbus.get(INFINIBAND_KEY).unwrap();
-        let p_key = infiniband.get("p-key").unwrap().downcast_ref::<i32>()?;
-        assert_eq!(p_key, 0x8002);
-        let parent: &str = infiniband.get("parent").unwrap().downcast_ref().unwrap();
-        assert_eq!(parent, "ib1");
-        let transport_mode: &str = infiniband
-            .get("transport-mode")
-            .unwrap()
-            .downcast_ref()
-            .unwrap();
-        assert_eq!(
-            transport_mode,
-            InfinibandTransportMode::Connected.to_string()
-        );
 
         Ok(())
     }
@@ -1886,7 +1683,7 @@ mod test {
         ])
     }
 
-    fn build_base_connection() -> Connection {
+    pub fn build_base_connection() -> Connection {
         let addresses = vec![
             "192.168.0.2/24".parse().unwrap(),
             "::ffff:c0a8:2".parse().unwrap(),
