@@ -96,6 +96,7 @@ impl ApiDocBuilder for NetworkApiDocBuilder {
             .schema_from::<crate::network::model::WirelessBand>()
             .schema_from::<crate::network::model::WirelessConfig>()
             .schema_from::<crate::network::model::WirelessMode>()
+            .schema_from::<crate::network::model::DhcpSettings>()
             .schema("IpAddr", schemas::ip_addr())
             .schema("IpInet", schemas::ip_inet())
             .schema("macaddr.MacAddr6", schemas::mac_addr6())

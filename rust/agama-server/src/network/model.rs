@@ -820,6 +820,17 @@ pub struct IpConfig {
     pub routes4: Vec<IpRoute>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub routes6: Vec<IpRoute>,
+    pub dhcp4_settings: Option<DhcpSettings>,
+    pub dhcp6_settings: Option<DhcpSettings>,
+    pub ip6_privacy: Option<i32>,
+}
+
+#[skip_serializing_none]
+#[derive(Default, Debug, PartialEq, Clone, Serialize, utoipa::ToSchema)]
+pub struct DhcpSettings {
+    pub send_hostname: bool,
+    pub hostname: Option<String>,
+    pub send_release: bool,
 }
 
 #[skip_serializing_none]

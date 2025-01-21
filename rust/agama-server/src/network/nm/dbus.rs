@@ -347,6 +347,16 @@ fn ip_config_to_ipv4_dbus(ip_config: &IpConfig) -> HashMap<&str, zvariant::Value
     if let Some(gateway) = &ip_config.gateway4 {
         ipv4_dbus.insert("gateway", gateway.to_string().into());
     }
+
+    if let Some(dhcp4_settings) = &ip_config.dhcp4_settings {
+        ipv4_dbus.insert("dhcp-send-hostname", dhcp4_settings.send_hostname.into());
+        let dhcp_send_release: i32 = if dhcp4_settings.send_release { 1 } else { 0 };
+        ipv4_dbus.insert("dhcp-send-release", dhcp_send_release.into());
+        if let Some(hostname) = &dhcp4_settings.hostname {
+            ipv4_dbus.insert("dhcp-hostname", hostname.into());
+        }
+    }
+
     ipv4_dbus
 }
 
@@ -395,6 +405,19 @@ fn ip_config_to_ipv6_dbus(ip_config: &IpConfig) -> HashMap<&str, zvariant::Value
     if let Some(gateway) = &ip_config.gateway6 {
         ipv6_dbus.insert("gateway", gateway.to_string().into());
     }
+
+    if let Some(ip6_privacy) = &ip_config.ip6_privacy {
+        ipv6_dbus.insert("ip6-privacy", ip6_privacy.into());
+    }
+
+    if let Some(dhcp6_settings) = &ip_config.dhcp6_settings {
+        ipv6_dbus.insert("dhcp-send-hostname", dhcp6_settings.send_hostname.into());
+        ipv6_dbus.insert("dhcp-send-release", dhcp6_settings.send_release.into());
+        if let Some(hostname) = &dhcp6_settings.hostname {
+            ipv6_dbus.insert("dhcp-hostname", hostname.into());
+        }
+    }
+
     ipv6_dbus
 }
 
