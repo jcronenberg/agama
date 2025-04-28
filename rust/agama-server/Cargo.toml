@@ -39,14 +39,14 @@ utoipa = { version = "5.2.0", features = ["axum_extras", "uuid"] }
 config = "0.14.0"
 rand = "0.8.5"
 axum-extra = { version = "0.9.4", features = ["cookie", "typed-header"] }
-pam = "0.8.0"
+pam = { version = "0.8.0", optional = true }
 serde_with = "3.10.0"
 pin-project = "1.1.5"
-openssl = "0.10.66"
+openssl = { version = "0.10.66", optional = true }
 sd-notify = "0.4.2"
 hyper = "1.4.1"
 hyper-util = "0.1.9"
-tokio-openssl = "0.6.5"
+tokio-openssl = { version = "0.6.5", optional = true }
 futures-util = { version = "0.3.30", default-features = false, features = [
     "alloc",
 ] }
@@ -68,3 +68,8 @@ path = "src/agama-web-server.rs"
 [dev-dependencies]
 http-body-util = "0.1.2"
 tokio-test = "0.4.4"
+
+[features]
+default = ["web", "cert"]
+web = ["dep:pam", "dep:openssl", "dep:tokio-openssl"]
+cert = ["dep:openssl"]

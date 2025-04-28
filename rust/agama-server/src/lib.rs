@@ -19,6 +19,7 @@
 // find current contact information at www.suse.com.
 
 pub mod bootloader;
+#[cfg(feature = "cert")]
 pub mod cert;
 pub mod dbus;
 pub mod error;
@@ -35,5 +36,6 @@ pub mod security;
 pub mod software;
 pub mod storage;
 pub mod users;
+#[cfg(feature = "web")]
 pub mod web;
 pub use web::service;
